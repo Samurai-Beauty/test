@@ -197,11 +197,124 @@
     .form-msg.success { background: #d4edda; color: #155724; display: block; }
     .form-msg.error { background: #f8d7da; color: #721c24; display: block; }
 
+    /* ===== シフト共通 ===== */
+    .month-nav { display: flex; align-items: center; gap: 8px; }
+    .month-nav button {
+      background: white; border: 1.5px solid #ddd; border-radius: 8px;
+      width: 32px; height: 32px; cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center; transition: all .2s; color: #333;
+    }
+    .month-nav button:hover { border-color: #0f3460; color: #0f3460; }
+    .month-label { font-size: 16px; font-weight: 700; min-width: 110px; text-align: center; }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-head { text-align: center; font-size: 12px; font-weight: 700; padding: 6px 2px; color: #888; }
+    .cal-head.sun { color: #e74c3c; }
+    .cal-head.sat { color: #3498db; }
+    .cal-cell {
+      min-height: 60px; border-radius: 8px; padding: 6px;
+      background: #f8f9fa; border: 2px solid transparent;
+      cursor: pointer; transition: all .2s; overflow: hidden;
+    }
+    .cal-cell:not(.empty):not(.past):hover { border-color: #0f3460; }
+    .cal-cell.empty { background: transparent; cursor: default; }
+    .cal-cell.past { opacity: 0.4; pointer-events: none; }
+    .cal-cell .day-num { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .cal-cell.sun .day-num { color: #e74c3c; }
+    .cal-cell.sat .day-num { color: #3498db; }
+    .cal-cell.today { background: #fff9e6 !important; border-color: #e2b96f !important; }
+    .cal-cell.state-work { background: #d4edda; border-color: #27ae60; }
+    .cal-cell.state-off  { background: #fde8e8; border-color: #e74c3c; }
+    .state-badge { font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 4px; display: inline-block; }
+    .state-work .state-badge { background: #27ae60; color: white; }
+    .state-off  .state-badge { background: #e74c3c; color: white; }
+    .state-empty .state-badge { background: #e0e0e0; color: #888; }
+
+    .shift-status-bar {
+      background: white; border-radius: 12px; padding: 14px 20px; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .submit-badge { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+    .submit-badge.done    { background: #d4edda; color: #155724; }
+    .submit-badge.pending { background: #fff3cd; color: #856404; }
+
+    /* シフト希望サマリー */
+    .shift-summary { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .shift-summary-item { font-size: 13px; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+    .shift-summary-item.work { background: #d4edda; color: #155724; }
+    .shift-summary-item.off  { background: #fde8e8; color: #721c24; }
+    .shift-summary-item.none { background: #f0f2f5; color: #888; }
+
+    /* 希望一覧テーブル */
+    .req-table-wrap { overflow-x: auto; }
+    table.req-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+    table.req-table th { background: #f0f2f5; padding: 6px 8px; text-align: center; font-weight: 700; white-space: nowrap; position: sticky; top: 0; }
+    table.req-table td { padding: 5px 8px; border-bottom: 1px solid #f0f2f5; text-align: center; }
+    table.req-table td.day-cell { text-align: left; font-weight: 700; white-space: nowrap; }
+    table.req-table tr.weekend-sun td { background: #fff8f8; }
+    table.req-table tr.weekend-sat td { background: #f8f9ff; }
+    .req-work { background: #d4edda; color: #155724; font-weight: 700; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+    .req-off  { background: #fde8e8; color: #721c24; font-weight: 700; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+    .req-none { color: #ccc; font-size: 11px; }
+
+    /* シフト作成カレンダー */
+    .sched-cell { min-height: 80px; }
+    .sched-cell .day-num { display: flex; align-items: center; justify-content: space-between; }
+    .staff-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+    .staff-tag {
+      background: #0f3460; color: white; border-radius: 4px; padding: 2px 5px;
+      font-size: 10px; cursor: pointer; transition: background .2s;
+    }
+    .staff-tag:hover { background: #e74c3c; }
+    .sched-add-btn {
+      background: none; border: 1px dashed #ccc; color: #aaa; border-radius: 4px;
+      padding: 1px 4px; font-size: 10px; cursor: pointer; margin-top: 3px;
+      width: 100%; transition: all .2s; display: block;
+    }
+    .sched-add-btn:hover { border-color: #0f3460; color: #0f3460; }
+
+    /* シフト閲覧カレンダー */
+    .view-cell { min-height: 72px; pointer-events: none; }
+    .view-staff-chip {
+      display: block; background: #1a1a2e; color: white; border-radius: 4px;
+      padding: 2px 5px; font-size: 10px; margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .view-staff-chip.me { background: #e2b96f; color: #1a1a2e; font-weight: 700; }
+
+    /* スタッフ選択モーダル */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal-box {
+      background: white; border-radius: 16px; padding: 28px; width: 320px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto;
+    }
+    .modal-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #1a1a2e; }
+    .modal-staff-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .modal-staff-btn {
+      padding: 9px 14px; border-radius: 8px; border: 1.5px solid #ddd;
+      cursor: pointer; text-align: left; font-size: 14px; transition: all .2s; background: white;
+    }
+    .modal-staff-btn:hover { border-color: #0f3460; }
+    .modal-staff-btn.selected { background: #0f3460; color: white; border-color: #0f3460; }
+    .modal-actions { display: flex; gap: 8px; }
+    .btn-cancel { flex: 1; padding: 9px; border-radius: 8px; border: 1.5px solid #ddd; cursor: pointer; background: white; font-size: 14px; }
+    .btn-cancel:hover { background: #f8f9fa; }
+    .nav-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0; }
+
     /* ===== モバイル対応 ===== */
     @media (max-width: 768px) {
       nav.sidebar { width: 56px; }
       nav.sidebar .nav-item span:not(.icon) { display: none; }
       main.content { padding: 16px; }
+    }
+    @media (max-width: 480px) {
+      .cal-cell { min-height: 48px; padding: 4px; }
+      .cal-cell .day-num { font-size: 11px; }
+      .state-badge { font-size: 9px; padding: 1px 3px; }
     }
   </style>
 </head>
@@ -247,6 +360,17 @@
       <div class="nav-item" onclick="showSection('sales')" id="nav-sales">
         <span class="icon">💴</span><span>売上管理</span>
       </div>
+      <div class="nav-divider"></div>
+      <div class="nav-item" onclick="showSection('shift-request')" id="nav-shift-request">
+        <span class="icon">📅</span><span>シフト希望</span>
+      </div>
+      <div class="nav-item" onclick="showSection('shift-manage')" id="nav-shift-manage" style="display:none">
+        <span class="icon">📋</span><span>シフト管理</span>
+      </div>
+      <div class="nav-item" onclick="showSection('shift-view')" id="nav-shift-view">
+        <span class="icon">👁</span><span>シフト閲覧</span>
+      </div>
+      <div class="nav-divider"></div>
       <div class="nav-item" onclick="showSection('profile')" id="nav-profile">
         <span class="icon">👤</span><span>プロフィール</span>
       </div>
@@ -430,6 +554,97 @@
         </div>
       </div>
 
+      <!-- ====== シフト希望提出 ====== -->
+      <div class="section" id="section-shift-request">
+        <div class="section-title">シフト希望提出</div>
+
+        <div class="shift-status-bar">
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <div class="month-nav">
+              <button onclick="shiftReqPrev()">&#8249;</button>
+              <span class="month-label" id="shiftReqLabel"></span>
+              <button onclick="shiftReqNext()">&#8250;</button>
+            </div>
+            <span class="submit-badge pending" id="shiftReqBadge">未提出</span>
+          </div>
+          <button class="btn-primary" onclick="submitShiftRequest()">提出する</button>
+        </div>
+
+        <div class="card" style="padding:14px 20px;margin-bottom:16px">
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:700;color:#555">凡例 / タップで切り替え:</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:12px">
+              <span style="background:#f8f9fa;border:2px solid #ddd;border-radius:4px;padding:2px 8px;color:#888">未回答</span>→
+              <span style="background:#d4edda;border:2px solid #27ae60;border-radius:4px;padding:2px 8px;color:#155724;font-weight:700">出勤希望</span>→
+              <span style="background:#fde8e8;border:2px solid #e74c3c;border-radius:4px;padding:2px 8px;color:#721c24;font-weight:700">休み希望</span>
+            </span>
+          </div>
+          <div class="shift-summary" id="shiftReqSummary" style="margin-top:10px"></div>
+        </div>
+
+        <div class="card">
+          <div id="shiftReqCalendar"></div>
+        </div>
+      </div>
+
+      <!-- ====== シフト管理（オーナー専用）====== -->
+      <div class="section" id="section-shift-manage">
+        <div class="section-title">シフト管理</div>
+
+        <div class="shift-status-bar">
+          <div class="month-nav">
+            <button onclick="shiftManagePrev()">&#8249;</button>
+            <span class="month-label" id="shiftManageLabel"></span>
+            <button onclick="shiftManageNext()">&#8250;</button>
+          </div>
+          <div class="store-tabs" style="margin:0">
+            <div class="store-tab active" id="manageTabReq" onclick="switchManageTab('requests')">📋 希望一覧</div>
+            <div class="store-tab" id="manageTabSched" onclick="switchManageTab('schedule')">✏️ シフト作成</div>
+          </div>
+        </div>
+
+        <!-- 希望一覧 -->
+        <div id="manageReqContent">
+          <div class="card">
+            <div class="card-title">スタッフ別シフト希望</div>
+            <div id="manageReqTable"></div>
+          </div>
+        </div>
+
+        <!-- シフト作成 -->
+        <div id="manageSchedContent" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span class="submit-badge pending" id="schedPubBadge">未公開</span>
+              <span style="font-size:12px;color:#888">「＋」でスタッフ追加 / 名前をクリックで削除</span>
+            </div>
+            <button class="btn-primary" onclick="doPublishShift()">シフトを公開する</button>
+          </div>
+          <div class="card">
+            <div id="manageSchedCalendar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== シフト閲覧 ====== -->
+      <div class="section" id="section-shift-view">
+        <div class="section-title">シフト閲覧</div>
+
+        <div class="shift-status-bar">
+          <div class="month-nav">
+            <button onclick="shiftViewPrev()">&#8249;</button>
+            <span class="month-label" id="shiftViewLabel"></span>
+            <button onclick="shiftViewNext()">&#8250;</button>
+          </div>
+          <span style="font-size:12px;color:#888">自分の名前は金色で表示</span>
+        </div>
+
+        <div id="shiftViewNotice" style="display:none" class="card"></div>
+        <div class="card" id="shiftViewCard" style="display:none">
+          <div id="shiftViewCalendar"></div>
+        </div>
+      </div>
+
       <!-- ====== プロフィール ====== -->
       <div class="section" id="section-profile">
         <div class="section-title">プロフィール</div>
@@ -481,10 +696,33 @@
   </div>
 </div>
 
+<!-- ====== スタッフ選択モーダル ====== -->
+<div class="modal-overlay" id="staffModal" style="display:none" onclick="closeStaffModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 id="modalDayLabel">担当スタッフを選択</h3>
+    <div class="modal-staff-list" id="modalStaffList"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('staffModal').style.display='none'">キャンセル</button>
+      <button class="btn-primary" onclick="confirmStaffModal()">確定</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ========================================
 // データ定義
 // ========================================
+
+const ALL_MEMBERS = ['オーナー', '田中', '鈴木', '佐藤', '山田', '伊藤', '渡辺'];
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+const WEEKDAY_CLS    = ['sun', '', '', '', '', '', 'sat'];
+
+// シフト月状態
+let shiftReqMonth    = { y: 0, m: 0 };
+let shiftManageMonth = { y: 0, m: 0 };
+let shiftViewMonth   = { y: 0, m: 0 };
+let shiftManageTab   = 'requests';
+let modalDay         = null;
 
 // デフォルトパスワード（localStorage で上書き可能）
 const DEFAULT_PASSWORDS = {
@@ -551,6 +789,14 @@ function doLogin() {
   // スプレッドシートURL 復元
   const savedUrl = localStorage.getItem('sheetCsvUrl') || '';
   document.getElementById('sheetCsvUrl').value = savedUrl;
+  // シフト月初期化
+  const _t = new Date();
+  shiftReqMonth    = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
+  shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
+  shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
+  // オーナーのみシフト管理を表示
+  document.getElementById('nav-shift-manage').style.display =
+    name === 'オーナー' ? 'flex' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
 }
@@ -572,6 +818,9 @@ function showSection(name) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'shift-request') renderShiftRequest();
+  else if (name === 'shift-manage') renderShiftManage();
+  else if (name === 'shift-view') renderShiftView();
 }
 
 // ========================================
@@ -928,6 +1177,368 @@ function changePassword() {
   document.getElementById('pwCurrent').value = '';
   document.getElementById('pwNew').value = '';
   document.getElementById('pwConfirm').value = '';
+}
+
+// ========================================
+// シフト — データ操作ユーティリティ
+// ========================================
+
+function shiftKey(prefix, y, m) {
+  return prefix + '_' + y + '-' + String(m).padStart(2, '0');
+}
+function getAllReqs(y, m) {
+  const raw = localStorage.getItem(shiftKey('sreq', y, m));
+  return raw ? JSON.parse(raw) : {};
+}
+function getMyReq(y, m) {
+  return getAllReqs(y, m)[currentUser] || {};
+}
+function saveMyReq(y, m, data) {
+  const all = getAllReqs(y, m);
+  all[currentUser] = data;
+  localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(all));
+}
+function isSubmitted(y, m, name) {
+  return localStorage.getItem(shiftKey('ssub', y, m) + '_' + name) === '1';
+}
+function markSubmitted(y, m, name) {
+  localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, '1');
+}
+function getSched(y, m) {
+  const raw = localStorage.getItem(shiftKey('ssched', y, m));
+  return raw ? JSON.parse(raw) : {};
+}
+function saveSched(y, m, data) {
+  localStorage.setItem(shiftKey('ssched', y, m), JSON.stringify(data));
+}
+function isPublished(y, m) {
+  return localStorage.getItem(shiftKey('spub', y, m)) === '1';
+}
+function markPublished(y, m) {
+  localStorage.setItem(shiftKey('spub', y, m), '1');
+}
+
+// ========================================
+// シフト — カレンダービルダー
+// ========================================
+
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function firstDow(y, m)    { return new Date(y, m - 1, 1).getDay(); }
+function isToday(y, m, d) {
+  const t = new Date();
+  return t.getFullYear() === y && t.getMonth() + 1 === m && t.getDate() === d;
+}
+function isPast(y, m, d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return new Date(y, m - 1, d) < t;
+}
+function fmtMonth(y, m) { return y + '年' + m + '月'; }
+
+function buildCells(y, m) {
+  const fd = firstDow(y, m);
+  const cnt = daysInMonth(y, m);
+  const cells = [];
+  for (let i = 0; i < fd; i++) cells.push(null);
+  for (let d = 1; d <= cnt; d++) {
+    cells.push({ day: d, dow: (fd + d - 1) % 7 });
+  }
+  return cells;
+}
+
+function calHeader() {
+  return WEEKDAY_LABELS.map((l, i) =>
+    `<div class="cal-head ${WEEKDAY_CLS[i]}">${l}</div>`
+  ).join('');
+}
+
+// ========================================
+// シフト希望提出
+// ========================================
+
+function renderShiftRequest() {
+  const { y, m } = shiftReqMonth;
+  document.getElementById('shiftReqLabel').textContent = fmtMonth(y, m);
+  const submitted = isSubmitted(y, m, currentUser);
+  const badge = document.getElementById('shiftReqBadge');
+  badge.textContent = submitted ? '提出済み' : '未提出';
+  badge.className = 'submit-badge ' + (submitted ? 'done' : 'pending');
+
+  const req = getMyReq(y, m);
+  // サマリー
+  let workCount = 0, offCount = 0, noneCount = 0;
+  const cnt = daysInMonth(y, m);
+  for (let d = 1; d <= cnt; d++) {
+    const s = req[String(d)] || '';
+    if (s === 'work') workCount++;
+    else if (s === 'off') offCount++;
+    else noneCount++;
+  }
+  document.getElementById('shiftReqSummary').innerHTML =
+    `<span class="shift-summary-item work">出勤希望: ${workCount}日</span>` +
+    `<span class="shift-summary-item off">休み希望: ${offCount}日</span>` +
+    `<span class="shift-summary-item none">未回答: ${noneCount}日</span>`;
+
+  // カレンダー
+  let html = '<div class="cal-grid">' + calHeader();
+  buildCells(y, m).forEach(cell => {
+    if (!cell) { html += '<div class="cal-cell empty"></div>'; return; }
+    const { day, dow } = cell;
+    const state = req[String(day)] || '';
+    const past = isPast(y, m, day);
+    let cls = 'cal-cell ' + WEEKDAY_CLS[dow];
+    if (isToday(y, m, day)) cls += ' today';
+    if (state === 'work') cls += ' state-work';
+    else if (state === 'off') cls += ' state-off';
+    else cls += ' state-empty';
+    if (past) cls += ' past';
+    const label = state === 'work' ? '出勤希望' : state === 'off' ? '休み希望' : '未回答';
+    const click = past ? '' : `onclick="toggleReqDay(${day})"`;
+    html += `<div class="${cls}" ${click}>`;
+    html += `<div class="day-num">${day}</div>`;
+    html += `<span class="state-badge">${label}</span></div>`;
+  });
+  html += '</div>';
+  document.getElementById('shiftReqCalendar').innerHTML = html;
+}
+
+function toggleReqDay(day) {
+  const { y, m } = shiftReqMonth;
+  const req = getMyReq(y, m);
+  const cur = req[String(day)] || '';
+  req[String(day)] = cur === '' ? 'work' : cur === 'work' ? 'off' : '';
+  saveMyReq(y, m, req);
+  renderShiftRequest();
+}
+
+function shiftReqPrev() {
+  shiftReqMonth.m--;
+  if (shiftReqMonth.m < 1) { shiftReqMonth.m = 12; shiftReqMonth.y--; }
+  renderShiftRequest();
+}
+function shiftReqNext() {
+  shiftReqMonth.m++;
+  if (shiftReqMonth.m > 12) { shiftReqMonth.m = 1; shiftReqMonth.y++; }
+  renderShiftRequest();
+}
+
+function submitShiftRequest() {
+  const { y, m } = shiftReqMonth;
+  if (isSubmitted(y, m, currentUser)) {
+    if (!confirm('すでに提出済みです。内容を更新しますか？')) return;
+  }
+  markSubmitted(y, m, currentUser);
+  renderShiftRequest();
+  alert(fmtMonth(y, m) + 'のシフト希望を提出しました！');
+}
+
+// ========================================
+// シフト管理（オーナー専用）
+// ========================================
+
+function renderShiftManage() {
+  const { y, m } = shiftManageMonth;
+  document.getElementById('shiftManageLabel').textContent = fmtMonth(y, m);
+  if (shiftManageTab === 'requests') {
+    document.getElementById('manageReqContent').style.display = 'block';
+    document.getElementById('manageSchedContent').style.display = 'none';
+    renderManageReqTable(y, m);
+  } else {
+    document.getElementById('manageReqContent').style.display = 'none';
+    document.getElementById('manageSchedContent').style.display = 'block';
+    renderManageSchedCal(y, m);
+  }
+}
+
+function renderManageReqTable(y, m) {
+  const allReqs = getAllReqs(y, m);
+  const cnt = daysInMonth(y, m);
+  const fd = firstDow(y, m);
+
+  // 提出状況チップ
+  let statusHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
+  ALL_MEMBERS.forEach(name => {
+    const done = isSubmitted(y, m, name);
+    statusHtml += `<span style="font-size:12px;padding:3px 12px;border-radius:20px;font-weight:700;` +
+      `background:${done ? '#d4edda' : '#f8f9fa'};color:${done ? '#155724' : '#aaa'}">` +
+      name + (done ? ' ✓' : ' —') + '</span>';
+  });
+  statusHtml += '</div>';
+
+  let html = statusHtml + '<div class="req-table-wrap"><table class="req-table"><thead><tr>';
+  html += '<th>日付</th>';
+  ALL_MEMBERS.forEach(n => { html += `<th>${n}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  for (let d = 1; d <= cnt; d++) {
+    const dow = (fd + d - 1) % 7;
+    const dowLabel = WEEKDAY_LABELS[dow];
+    const rowCls = dow === 0 ? 'weekend-sun' : dow === 6 ? 'weekend-sat' : '';
+    const colStyle = dow === 0 ? 'color:#e74c3c' : dow === 6 ? 'color:#3498db' : '';
+    html += `<tr class="${rowCls}"><td class="day-cell" style="${colStyle}">${d}日(${dowLabel})</td>`;
+    ALL_MEMBERS.forEach(name => {
+      const state = (allReqs[name] || {})[String(d)] || '';
+      if (state === 'work') html += '<td><span class="req-work">出勤</span></td>';
+      else if (state === 'off') html += '<td><span class="req-off">休み</span></td>';
+      else html += '<td><span class="req-none">—</span></td>';
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('manageReqTable').innerHTML = html;
+}
+
+function renderManageSchedCal(y, m) {
+  const sched = getSched(y, m);
+  const pub = isPublished(y, m);
+  const badge = document.getElementById('schedPubBadge');
+  badge.textContent = pub ? '公開済み' : '未公開';
+  badge.className = 'submit-badge ' + (pub ? 'done' : 'pending');
+
+  let html = '<div class="cal-grid">' + calHeader();
+  buildCells(y, m).forEach(cell => {
+    if (!cell) { html += '<div class="cal-cell empty"></div>'; return; }
+    const { day, dow } = cell;
+    const staffList = sched[String(day)] || [];
+    let cls = 'cal-cell sched-cell ' + WEEKDAY_CLS[dow];
+    if (isToday(y, m, day)) cls += ' today';
+    html += `<div class="${cls}">`;
+    html += `<div class="day-num"><span>${day}</span>`;
+    html += `<button class="sched-add-btn" style="width:auto;padding:1px 5px;margin:0;display:inline-block" onclick="openModal(${day})">＋</button></div>`;
+    html += '<div class="staff-tags">';
+    staffList.forEach(name => {
+      html += `<span class="staff-tag" onclick="removeSchedStaff(${day},'${name}')">${name} ×</span>`;
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  document.getElementById('manageSchedCalendar').innerHTML = html;
+}
+
+function switchManageTab(tab) {
+  shiftManageTab = tab;
+  document.getElementById('manageTabReq').classList.toggle('active', tab === 'requests');
+  document.getElementById('manageTabSched').classList.toggle('active', tab === 'schedule');
+  renderShiftManage();
+}
+function shiftManagePrev() {
+  shiftManageMonth.m--;
+  if (shiftManageMonth.m < 1) { shiftManageMonth.m = 12; shiftManageMonth.y--; }
+  renderShiftManage();
+}
+function shiftManageNext() {
+  shiftManageMonth.m++;
+  if (shiftManageMonth.m > 12) { shiftManageMonth.m = 1; shiftManageMonth.y++; }
+  renderShiftManage();
+}
+
+function removeSchedStaff(day, name) {
+  const { y, m } = shiftManageMonth;
+  const sched = getSched(y, m);
+  sched[String(day)] = (sched[String(day)] || []).filter(n => n !== name);
+  if (!sched[String(day)].length) delete sched[String(day)];
+  saveSched(y, m, sched);
+  renderManageSchedCal(y, m);
+}
+
+function openModal(day) {
+  modalDay = day;
+  const { y, m } = shiftManageMonth;
+  const sched = getSched(y, m);
+  const assigned = sched[String(day)] || [];
+  const allReqs  = getAllReqs(y, m);
+  document.getElementById('modalDayLabel').textContent = day + '日 担当スタッフを選択';
+  let html = '';
+  ALL_MEMBERS.forEach(name => {
+    const sel = assigned.includes(name);
+    const req = (allReqs[name] || {})[String(day)] || '';
+    const hint = req === 'work' ? ' 🟢' : req === 'off' ? ' 🔴' : '';
+    html += `<button class="modal-staff-btn ${sel ? 'selected' : ''}" data-name="${name}" onclick="this.classList.toggle('selected')">`;
+    html += name + hint + '</button>';
+  });
+  document.getElementById('modalStaffList').innerHTML = html;
+  document.getElementById('staffModal').style.display = 'flex';
+}
+
+function confirmStaffModal() {
+  const { y, m } = shiftManageMonth;
+  const sched = getSched(y, m);
+  const selected = Array.from(
+    document.querySelectorAll('#modalStaffList .modal-staff-btn.selected')
+  ).map(btn => btn.dataset.name);
+  if (selected.length > 0) sched[String(modalDay)] = selected;
+  else delete sched[String(modalDay)];
+  saveSched(y, m, sched);
+  document.getElementById('staffModal').style.display = 'none';
+  renderManageSchedCal(y, m);
+}
+
+function closeStaffModal(e) {
+  if (e.target === document.getElementById('staffModal')) {
+    document.getElementById('staffModal').style.display = 'none';
+  }
+}
+
+function doPublishShift() {
+  const { y, m } = shiftManageMonth;
+  if (!confirm(fmtMonth(y, m) + 'のシフトを公開しますか？')) return;
+  markPublished(y, m);
+  renderShiftManage();
+  alert('シフトを公開しました！スタッフがシフト閲覧で確認できます。');
+}
+
+// ========================================
+// シフト閲覧
+// ========================================
+
+function renderShiftView() {
+  const { y, m } = shiftViewMonth;
+  document.getElementById('shiftViewLabel').textContent = fmtMonth(y, m);
+  const pub = isPublished(y, m);
+  const notice = document.getElementById('shiftViewNotice');
+  const card   = document.getElementById('shiftViewCard');
+
+  if (!pub) {
+    notice.style.display = 'block';
+    notice.innerHTML = '<p style="color:#aaa;text-align:center;padding:16px;font-size:14px">この月のシフトはまだ公開されていません</p>';
+    card.style.display = 'none';
+    return;
+  }
+  notice.style.display = 'none';
+  card.style.display = 'block';
+
+  const sched = getSched(y, m);
+  let html = '<div class="cal-grid">' + calHeader();
+  buildCells(y, m).forEach(cell => {
+    if (!cell) { html += '<div class="cal-cell empty"></div>'; return; }
+    const { day, dow } = cell;
+    const staffList = sched[String(day)] || [];
+    let cls = 'cal-cell view-cell ' + WEEKDAY_CLS[dow];
+    if (isToday(y, m, day)) cls += ' today';
+    html += `<div class="${cls}">`;
+    html += `<div class="day-num">${day}</div>`;
+    if (staffList.length === 0) {
+      html += '<span style="font-size:10px;color:#ccc">—</span>';
+    } else {
+      staffList.forEach(name => {
+        const me = name === currentUser;
+        html += `<span class="view-staff-chip ${me ? 'me' : ''}">${name}</span>`;
+      });
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('shiftViewCalendar').innerHTML = html;
+}
+
+function shiftViewPrev() {
+  shiftViewMonth.m--;
+  if (shiftViewMonth.m < 1) { shiftViewMonth.m = 12; shiftViewMonth.y--; }
+  renderShiftView();
+}
+function shiftViewNext() {
+  shiftViewMonth.m++;
+  if (shiftViewMonth.m > 12) { shiftViewMonth.m = 1; shiftViewMonth.y++; }
+  renderShiftView();
 }
 
 // ========================================
