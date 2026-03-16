@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>サムライ美容室 — 社内システム</title>
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+    /* ===== ログイン画面 ===== */
+    #loginScreen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+    .login-box {
+      background: white; border-radius: 16px; padding: 40px; width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .login-box h1 { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 8px; color: #1a1a2e; }
+    .login-box p.subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 28px; }
+    .login-box label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #555; }
+    .login-box select, .login-box input[type="password"] {
+      width: 100%; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 14px; margin-bottom: 16px; outline: none; transition: border-color .2s;
+    }
+    .login-box select:focus, .login-box input:focus { border-color: #0f3460; }
+    .btn-login {
+      width: 100%; padding: 12px; background: #0f3460; color: white; border: none;
+      border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; transition: background .2s;
+    }
+    .btn-login:hover { background: #16213e; }
+    .login-error { color: #e74c3c; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
+
+    /* ===== メインアプリ ===== */
+    #app { display: none; }
+
+    /* ===== ヘッダー ===== */
+    header {
+      background: #1a1a2e; color: white; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    header .brand { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+    header .brand span { color: #e2b96f; }
+    header .user-info { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    header .user-info .user-name { font-weight: 600; }
+    .btn-logout {
+      background: transparent; border: 1.5px solid rgba(255,255,255,0.4); color: white;
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all .2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.1); }
+
+    /* ===== サイドバー + コンテンツ ===== */
+    .layout { display: flex; min-height: calc(100vh - 56px); }
+    nav.sidebar {
+      width: 200px; background: #16213e; color: white; padding: 16px 0;
+      flex-shrink: 0;
+    }
+    nav.sidebar .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+      cursor: pointer; font-size: 14px; transition: background .2s; border-left: 3px solid transparent;
+    }
+    nav.sidebar .nav-item:hover { background: rgba(255,255,255,0.07); }
+    nav.sidebar .nav-item.active { background: rgba(255,255,255,0.12); border-left-color: #e2b96f; font-weight: 700; }
+    nav.sidebar .nav-item .icon { font-size: 18px; }
+
+    main.content { flex: 1; padding: 28px; overflow-y: auto; }
+
+    /* ===== セクション共通 ===== */
+    .section { display: none; }
+    .section.active { display: block; }
+    .section-title { font-size: 22px; font-weight: 700; margin-bottom: 20px; color: #1a1a2e; }
+
+    /* ===== カード ===== */
+    .card {
+      background: white; border-radius: 12px; padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;
+    }
+    .card-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #1a1a2e; }
+
+    /* ===== ダッシュボード ===== */
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .dash-card {
+      background: white; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center;
+    }
+    .dash-card .label { font-size: 12px; color: #888; margin-bottom: 8px; }
+    .dash-card .value { font-size: 32px; font-weight: 700; color: #1a1a2e; }
+    .dash-card .unit { font-size: 13px; color: #888; margin-top: 4px; }
+    .sync-bar {
+      background: white; border-radius: 12px; padding: 16px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sync-status { display: flex; align-items: center; gap: 10px; }
+    .sync-dot { width: 10px; height: 10px; border-radius: 50%; background: #2ecc71; }
+    .sync-dot.ok { animation: blink 1.5s infinite; }
+    .sync-dot.error { background: #e74c3c; animation: none; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .sync-text { font-size: 13px; color: #555; }
+    .btn-refresh {
+      background: #0f3460; color: white; border: none; padding: 8px 18px;
+      border-radius: 8px; font-size: 13px; cursor: pointer; transition: background .2s;
+    }
+    .btn-refresh:hover { background: #16213e; }
+    .staff-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .staff-chip {
+      background: #f0f2f5; border-radius: 20px; padding: 4px 14px;
+      font-size: 13px; color: #333;
+    }
+    .sheet-config { margin-top: 8px; }
+    .sheet-config label { font-size: 13px; color: #555; margin-bottom: 4px; display: block; }
+    .sheet-config input {
+      width: 100%; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 13px; outline: none; transition: border-color .2s;
+    }
+    .sheet-config input:focus { border-color: #0f3460; }
+
+    /* ===== 売上管理 ===== */
+    .store-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .store-tab {
+      padding: 8px 20px; border-radius: 8px; border: 2px solid #ddd;
+      cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; background: white;
+    }
+    .store-tab.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+    .store-tab:hover:not(.active) { border-color: #aaa; }
+
+    /* ドロップゾーン */
+    .drop-zone {
+      border: 2.5px dashed #c0c4cc; border-radius: 12px; padding: 32px;
+      text-align: center; cursor: pointer; transition: all .2s; margin-bottom: 16px;
+      background: #fafafa;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #0f3460; background: #eef2ff; }
+    .drop-zone .dz-icon { font-size: 36px; margin-bottom: 10px; }
+    .drop-zone .dz-text { font-size: 14px; color: #555; }
+    .drop-zone .dz-sub { font-size: 12px; color: #aaa; margin-top: 4px; }
+
+    /* 個別店舗ドロップゾーン */
+    .store-drop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .store-drop-item { }
+    .store-drop-item .store-label { font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #1a1a2e; }
+    .store-drop-item .drop-zone { padding: 20px; margin-bottom: 0; }
+    .store-drop-item .drop-zone .dz-icon { font-size: 24px; margin-bottom: 6px; }
+    .store-drop-item .file-name { font-size: 12px; color: #27ae60; margin-top: 6px; font-weight: 600; }
+
+    /* CSVテーブル */
+    .csv-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .csv-stat { background: #f8f9fa; border-radius: 8px; padding: 12px; text-align: center; }
+    .csv-stat .s-label { font-size: 11px; color: #888; }
+    .csv-stat .s-value { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-top: 2px; }
+    table.sales-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.sales-table th { background: #f0f2f5; padding: 8px 12px; text-align: left; font-weight: 600; }
+    table.sales-table td { padding: 8px 12px; border-bottom: 1px solid #f0f2f5; }
+    table.sales-table tr:last-child td { border-bottom: none; }
+    table.sales-table tr:hover td { background: #fafbff; }
+
+    /* 全店比較 */
+    .comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .store-summary-card {
+      background: white; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-top: 4px solid #1a1a2e;
+    }
+    .store-summary-card:nth-child(1) { border-top-color: #e2b96f; }
+    .store-summary-card:nth-child(2) { border-top-color: #3498db; }
+    .store-summary-card:nth-child(3) { border-top-color: #2ecc71; }
+    .store-summary-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .store-summary-card .big-num { font-size: 26px; font-weight: 700; color: #1a1a2e; }
+    .store-summary-card .detail { font-size: 12px; color: #888; margin-top: 4px; }
+
+    /* ===== プロフィール ===== */
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .profile-grid { grid-template-columns: 1fr; } }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #555; }
+    .form-group input {
+      width: 100%; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 14px; outline: none; transition: border-color .2s;
+    }
+    .form-group input:focus { border-color: #0f3460; }
+    .input-eye-wrap { position: relative; }
+    .input-eye-wrap input { padding-right: 44px; }
+    .eye-btn {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 18px; color: #aaa;
+    }
+    .btn-primary {
+      background: #0f3460; color: white; border: none; padding: 10px 24px;
+      border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s;
+    }
+    .btn-primary:hover { background: #16213e; }
+    .form-msg { font-size: 13px; margin-top: 10px; padding: 8px 12px; border-radius: 6px; display: none; }
+    .form-msg.success { background: #d4edda; color: #155724; display: block; }
+    .form-msg.error { background: #f8d7da; color: #721c24; display: block; }
+
+    /* ===== モバイル対応 ===== */
+    @media (max-width: 768px) {
+      nav.sidebar { width: 56px; }
+      nav.sidebar .nav-item span:not(.icon) { display: none; }
+      main.content { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== ログイン画面 ==================== -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>✂ サムライ美容室</h1>
+    <p class="subtitle">社内管理システム</p>
+    <label for="loginName">スタイリスト名</label>
+    <select id="loginName">
+      <option value="">— 選択してください —</option>
+      <option value="オーナー">オーナー</option>
+      <option value="田中">田中</option>
+      <option value="鈴木">鈴木</option>
+      <option value="佐藤">佐藤</option>
+      <option value="山田">山田</option>
+      <option value="伊藤">伊藤</option>
+      <option value="渡辺">渡辺</option>
+    </select>
+    <label for="loginPass">パスワード</label>
+    <input type="password" id="loginPass" placeholder="パスワードを入力">
+    <button class="btn-login" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="loginError">スタイリスト名またはパスワードが違います</div>
+  </div>
+</div>
+
+<!-- ==================== メインアプリ ==================== -->
+<div id="app">
+  <header>
+    <div class="brand">✂ <span>サムライ</span>美容室</div>
+    <div class="user-info">
+      <span class="user-name" id="headerUserName"></span>
+      <button class="btn-logout" onclick="doLogout()">ログアウト</button>
+    </div>
+  </header>
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+        <span class="icon">📊</span><span>ダッシュボード</span>
+      </div>
+      <div class="nav-item" onclick="showSection('sales')" id="nav-sales">
+        <span class="icon">💴</span><span>売上管理</span>
+      </div>
+      <div class="nav-item" onclick="showSection('profile')" id="nav-profile">
+        <span class="icon">👤</span><span>プロフィール</span>
+      </div>
+    </nav>
+    <main class="content">
+
+      <!-- ====== ダッシュボード ====== -->
+      <div class="section active" id="section-dashboard">
+        <div class="section-title">ダッシュボード</div>
+
+        <!-- 同期バー -->
+        <div class="sync-bar">
+          <div class="sync-status">
+            <div class="sync-dot ok" id="syncDot"></div>
+            <span class="sync-text" id="syncText">最終更新: 未取得</span>
+          </div>
+          <button class="btn-refresh" onclick="fetchDashboardData()">🔄 手動更新</button>
+        </div>
+
+        <!-- スプレッドシート設定 -->
+        <div class="card" id="sheetConfigCard">
+          <div class="card-title">📋 Googleスプレッドシート設定</div>
+          <div class="sheet-config">
+            <label>スプレッドシートCSV公開URL（dashboardシート）</label>
+            <input type="url" id="sheetCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/XXXXX/export?format=csv&gid=XXXXX"
+              oninput="saveSheetUrl()">
+          </div>
+          <p style="font-size:12px;color:#aaa;margin-top:8px;">
+            スプレッドシートを「ファイル → 共有 → ウェブに公開」してCSV形式のURLを貼り付けてください
+          </p>
+        </div>
+
+        <!-- KPIカード -->
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="label">本日の予約数</div>
+            <div class="value" id="dashReservations">—</div>
+            <div class="unit">件</div>
+          </div>
+          <div class="dash-card">
+            <div class="label">出勤人数</div>
+            <div class="value" id="dashStaffCount">—</div>
+            <div class="unit">名</div>
+          </div>
+          <div class="dash-card">
+            <div class="label">次回更新</div>
+            <div class="value" id="dashNextUpdate" style="font-size:20px">—</div>
+            <div class="unit"></div>
+          </div>
+        </div>
+
+        <!-- 出勤スタッフ -->
+        <div class="card">
+          <div class="card-title">👥 本日の出勤スタッフ</div>
+          <div class="staff-list" id="dashStaffList">
+            <span style="color:#aaa;font-size:13px">データ未取得</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 売上管理 ====== -->
+      <div class="section" id="section-sales">
+        <div class="section-title">売上管理</div>
+
+        <!-- タブ -->
+        <div class="store-tabs">
+          <div class="store-tab active" onclick="switchStoreTab('all')">📊 全店合計</div>
+          <div class="store-tab" onclick="switchStoreTab('nishishinjuku')">🏠 西新宿本店</div>
+          <div class="store-tab" onclick="switchStoreTab('sanchome')">🏢 新宿三丁目</div>
+          <div class="store-tab" onclick="switchStoreTab('shibuya')">🌿 渋谷東店</div>
+        </div>
+
+        <!-- 一括アップロード -->
+        <div class="card">
+          <div class="card-title">📁 一括アップロード（3ファイルまとめてドロップ）</div>
+          <div class="drop-zone" id="bulkDropZone"
+            ondragover="dzDragOver(event,'bulkDropZone')"
+            ondragleave="dzDragLeave('bulkDropZone')"
+            ondrop="dzDropBulk(event)"
+            onclick="document.getElementById('bulkFileInput').click()">
+            <div class="dz-icon">📂</div>
+            <div class="dz-text">ここに全店舗のCSVをまとめてドロップ</div>
+            <div class="dz-sub">ファイル名から店舗を自動判定します</div>
+          </div>
+          <input type="file" id="bulkFileInput" accept=".csv" multiple style="display:none"
+            onchange="handleBulkFiles(this.files)">
+        </div>
+
+        <!-- 個別店舗ドロップゾーン -->
+        <div class="card">
+          <div class="card-title">🏪 店舗別アップロード</div>
+          <div class="store-drop-grid">
+            <div class="store-drop-item">
+              <div class="store-label">西新宿本店（西新宿小滝橋通り）</div>
+              <div class="drop-zone" id="dz-nishishinjuku"
+                ondragover="dzDragOver(event,'dz-nishishinjuku')"
+                ondragleave="dzDragLeave('dz-nishishinjuku')"
+                ondrop="dzDropSingle(event,'nishishinjuku')"
+                onclick="document.getElementById('fi-nishishinjuku').click()">
+                <div class="dz-icon">📄</div>
+                <div class="dz-text">CSVをドロップ</div>
+              </div>
+              <div class="file-name" id="fn-nishishinjuku"></div>
+              <input type="file" id="fi-nishishinjuku" accept=".csv" style="display:none"
+                onchange="loadStoreCsv('nishishinjuku', this.files[0])">
+            </div>
+            <div class="store-drop-item">
+              <div class="store-label">新宿三丁目</div>
+              <div class="drop-zone" id="dz-sanchome"
+                ondragover="dzDragOver(event,'dz-sanchome')"
+                ondragleave="dzDragLeave('dz-sanchome')"
+                ondrop="dzDropSingle(event,'sanchome')"
+                onclick="document.getElementById('fi-sanchome').click()">
+                <div class="dz-icon">📄</div>
+                <div class="dz-text">CSVをドロップ</div>
+              </div>
+              <div class="file-name" id="fn-sanchome"></div>
+              <input type="file" id="fi-sanchome" accept=".csv" style="display:none"
+                onchange="loadStoreCsv('sanchome', this.files[0])">
+            </div>
+            <div class="store-drop-item">
+              <div class="store-label">渋谷東店（渋谷東）</div>
+              <div class="drop-zone" id="dz-shibuya"
+                ondragover="dzDragOver(event,'dz-shibuya')"
+                ondragleave="dzDragLeave('dz-shibuya')"
+                ondrop="dzDropSingle(event,'shibuya')"
+                onclick="document.getElementById('fi-shibuya').click()">
+                <div class="dz-icon">📄</div>
+                <div class="dz-text">CSVをドロップ</div>
+              </div>
+              <div class="file-name" id="fn-shibuya"></div>
+              <input type="file" id="fi-shibuya" accept=".csv" style="display:none"
+                onchange="loadStoreCsv('shibuya', this.files[0])">
+            </div>
+          </div>
+        </div>
+
+        <!-- 全店合計タブコンテンツ -->
+        <div id="storeContent-all">
+          <div class="comparison-grid" id="comparisonGrid">
+            <div class="store-summary-card">
+              <h3>🏠 西新宿本店</h3>
+              <div class="big-num" id="cmp-nishishinjuku-sales">—</div>
+              <div class="detail" id="cmp-nishishinjuku-txn">データなし</div>
+            </div>
+            <div class="store-summary-card">
+              <h3>🏢 新宿三丁目</h3>
+              <div class="big-num" id="cmp-sanchome-sales">—</div>
+              <div class="detail" id="cmp-sanchome-txn">データなし</div>
+            </div>
+            <div class="store-summary-card">
+              <h3>🌿 渋谷東店</h3>
+              <div class="big-num" id="cmp-shibuya-sales">—</div>
+              <div class="detail" id="cmp-shibuya-txn">データなし</div>
+            </div>
+          </div>
+          <div class="card" id="totalSummaryCard" style="display:none">
+            <div class="card-title">合計</div>
+            <div id="totalSummaryContent"></div>
+          </div>
+        </div>
+
+        <!-- 各店舗タブコンテンツ -->
+        <div id="storeContent-nishishinjuku" style="display:none">
+          <div class="card" id="card-nishishinjuku">
+            <div class="card-title">西新宿本店 — 売上詳細</div>
+            <div id="data-nishishinjuku"><p style="color:#aaa">CSVをアップロードしてください</p></div>
+          </div>
+        </div>
+        <div id="storeContent-sanchome" style="display:none">
+          <div class="card" id="card-sanchome">
+            <div class="card-title">新宿三丁目 — 売上詳細</div>
+            <div id="data-sanchome"><p style="color:#aaa">CSVをアップロードしてください</p></div>
+          </div>
+        </div>
+        <div id="storeContent-shibuya" style="display:none">
+          <div class="card" id="card-shibuya">
+            <div class="card-title">渋谷東店 — 売上詳細</div>
+            <div id="data-shibuya"><p style="color:#aaa">CSVをアップロードしてください</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== プロフィール ====== -->
+      <div class="section" id="section-profile">
+        <div class="section-title">プロフィール</div>
+        <div class="profile-grid">
+          <!-- ユーザー情報 -->
+          <div class="card">
+            <div class="card-title">👤 アカウント情報</div>
+            <div class="form-group">
+              <label>スタイリスト名</label>
+              <input type="text" id="profileName" readonly style="background:#f8f9fa">
+            </div>
+            <div class="form-group">
+              <label>役職</label>
+              <input type="text" id="profileRole" readonly style="background:#f8f9fa">
+            </div>
+          </div>
+
+          <!-- パスワード変更 -->
+          <div class="card">
+            <div class="card-title">🔒 パスワード変更</div>
+            <div class="form-group">
+              <label>現在のパスワード</label>
+              <div class="input-eye-wrap">
+                <input type="password" id="pwCurrent" placeholder="現在のパスワード">
+                <button class="eye-btn" onclick="toggleEye('pwCurrent', this)">👁</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>新しいパスワード</label>
+              <div class="input-eye-wrap">
+                <input type="password" id="pwNew" placeholder="新しいパスワード（6文字以上）">
+                <button class="eye-btn" onclick="toggleEye('pwNew', this)">👁</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>新しいパスワード（確認）</label>
+              <div class="input-eye-wrap">
+                <input type="password" id="pwConfirm" placeholder="もう一度入力">
+                <button class="eye-btn" onclick="toggleEye('pwConfirm', this)">👁</button>
+              </div>
+            </div>
+            <button class="btn-primary" onclick="changePassword()">パスワードを変更</button>
+            <div class="form-msg" id="pwMsg"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ========================================
+// データ定義
+// ========================================
+
+// デフォルトパスワード（localStorage で上書き可能）
+const DEFAULT_PASSWORDS = {
+  'オーナー': 'owner123',
+  '田中': 'staff123',
+  '鈴木': 'staff123',
+  '佐藤': 'staff123',
+  '山田': 'staff123',
+  '伊藤': 'staff123',
+  '渡辺': 'staff123',
+};
+
+// Squareの正式店舗名 → 内部キーの対応辞書
+const STORE_NAME_MAP = {
+  // 西新宿本店
+  '西新宿小滝橋通り': 'nishishinjuku',
+  '西新宿': 'nishishinjuku',
+  'nishishinjuku': 'nishishinjuku',
+  'nishi': 'nishishinjuku',
+  'honten': 'nishishinjuku',
+  // 新宿三丁目
+  '新宿三丁目': 'sanchome',
+  '三丁目': 'sanchome',
+  'sanchome': 'sanchome',
+  'shinjuku3': 'sanchome',
+  // 渋谷東
+  '渋谷東': 'shibuya',
+  '渋谷': 'shibuya',
+  'shibuya': 'shibuya',
+  'higashi': 'shibuya',
+};
+
+const STORE_LABELS = {
+  nishishinjuku: '西新宿本店',
+  sanchome: '新宿三丁目',
+  shibuya: '渋谷東店',
+};
+
+let currentUser = null;
+let storeData = { nishishinjuku: null, sanchome: null, shibuya: null };
+let dashboardTimer = null;
+
+// ========================================
+// ログイン / ログアウト
+// ========================================
+function getPassword(name) {
+  return localStorage.getItem('pw_' + name) || DEFAULT_PASSWORDS[name] || null;
+}
+
+function doLogin() {
+  const name = document.getElementById('loginName').value;
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginError');
+  if (!name) { err.style.display = 'block'; err.textContent = 'スタイリスト名を選択してください'; return; }
+  const expected = getPassword(name);
+  if (!expected || pass !== expected) { err.style.display = 'block'; err.textContent = 'パスワードが違います'; return; }
+  err.style.display = 'none';
+  currentUser = name;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('headerUserName').textContent = name;
+  document.getElementById('profileName').value = name;
+  document.getElementById('profileRole').value = name === 'オーナー' ? 'オーナー' : 'スタイリスト';
+  // スプレッドシートURL 復元
+  const savedUrl = localStorage.getItem('sheetCsvUrl') || '';
+  document.getElementById('sheetCsvUrl').value = savedUrl;
+  // ダッシュボード自動更新スケジュール
+  scheduleDashboardUpdates();
+}
+
+function doLogout() {
+  currentUser = null;
+  clearInterval(dashboardTimer);
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginName').value = '';
+}
+
+// ========================================
+// ナビゲーション
+// ========================================
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ========================================
+// 売上管理 — タブ切り替え
+// ========================================
+function switchStoreTab(storeKey) {
+  // タブハイライト
+  document.querySelectorAll('.store-tab').forEach((t, i) => {
+    const keys = ['all', 'nishishinjuku', 'sanchome', 'shibuya'];
+    t.classList.toggle('active', keys[i] === storeKey);
+  });
+  // コンテンツ表示切り替え
+  ['all', 'nishishinjuku', 'sanchome', 'shibuya'].forEach(k => {
+    const el = document.getElementById('storeContent-' + k);
+    if (el) el.style.display = k === storeKey ? 'block' : 'none';
+  });
+}
+
+// ========================================
+// ドラッグ & ドロップ ユーティリティ
+// ========================================
+function dzDragOver(e, id) {
+  e.preventDefault();
+  document.getElementById(id).classList.add('drag-over');
+}
+function dzDragLeave(id) {
+  document.getElementById(id).classList.remove('drag-over');
+}
+
+// 一括ドロップ
+function dzDropBulk(e) {
+  e.preventDefault();
+  document.getElementById('bulkDropZone').classList.remove('drag-over');
+  handleBulkFiles(e.dataTransfer.files);
+}
+
+function handleBulkFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.name.toLowerCase().endsWith('.csv')) return;
+    const storeKey = detectStoreFromFilename(file.name);
+    if (storeKey) {
+      loadStoreCsv(storeKey, file);
+    } else {
+      alert('ファイル「' + file.name + '」の店舗を判定できませんでした。\n' +
+        'ファイル名に「西新宿小滝橋通り」「新宿三丁目」「渋谷東」などを含めてください。');
+    }
+  });
+}
+
+// ファイル名から店舗キーを判定
+function detectStoreFromFilename(filename) {
+  const lower = filename.toLowerCase();
+  for (const [keyword, storeKey] of Object.entries(STORE_NAME_MAP)) {
+    if (lower.includes(keyword.toLowerCase())) return storeKey;
+  }
+  return null;
+}
+
+// 個別ドロップ
+function dzDropSingle(e, storeKey) {
+  e.preventDefault();
+  document.getElementById('dz-' + storeKey).classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadStoreCsv(storeKey, file);
+}
+
+// ========================================
+// CSVロード & パース
+// ========================================
+function loadStoreCsv(storeKey, file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    const parsed = parseSquareCsv(text);
+    storeData[storeKey] = parsed;
+    document.getElementById('fn-' + storeKey).textContent = '✓ ' + file.name;
+    renderStoreData(storeKey, parsed);
+    renderComparison();
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseSquareCsv(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if (lines.length < 2) return { rows: [], totalSales: 0, txnCount: 0 };
+
+  // ヘッダー行を探す
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    if (lines[i].includes('合計') || lines[i].includes('売上') || lines[i].toLowerCase().includes('total') || lines[i].toLowerCase().includes('amount')) {
+      headerIdx = i;
+      break;
+    }
+  }
+
+  const headers = parseCsvLine(lines[headerIdx]);
+  const rows = [];
+  let totalSales = 0;
+  let txnCount = 0;
+
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const vals = parseCsvLine(lines[i]);
+    if (vals.length < 2) continue;
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+    rows.push(row);
+    txnCount++;
+
+    // 売上金額を探す（「合計」「総売上」「金額」などのカラム）
+    const amtKeys = headers.filter(h =>
+      h.includes('合計') || h.includes('売上') || h.toLowerCase().includes('total') || h.toLowerCase().includes('amount') || h.includes('金額')
+    );
+    if (amtKeys.length > 0) {
+      const raw = row[amtKeys[0]] || '0';
+      const num = parseFloat(raw.replace(/[¥,￥\s]/g, '')) || 0;
+      totalSales += num;
+    }
+  }
+
+  return { headers, rows, totalSales, txnCount };
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+// ========================================
+// 売上データ表示
+// ========================================
+function renderStoreData(storeKey, parsed) {
+  const container = document.getElementById('data-' + storeKey);
+  if (!container) return;
+  if (!parsed || parsed.rows.length === 0) {
+    container.innerHTML = '<p style="color:#aaa">データがありません</p>';
+    return;
+  }
+
+  const fmtYen = n => '¥' + Math.round(n).toLocaleString();
+
+  let html = '<div class="csv-summary">';
+  html += `<div class="csv-stat"><div class="s-label">総売上</div><div class="s-value">${fmtYen(parsed.totalSales)}</div></div>`;
+  html += `<div class="csv-stat"><div class="s-label">取引件数</div><div class="s-value">${parsed.txnCount}件</div></div>`;
+  if (parsed.txnCount > 0) {
+    html += `<div class="csv-stat"><div class="s-label">平均単価</div><div class="s-value">${fmtYen(parsed.totalSales / parsed.txnCount)}</div></div>`;
+  }
+  html += '</div>';
+
+  // テーブル（最大50行）
+  const displayRows = parsed.rows.slice(0, 50);
+  html += '<div style="overflow-x:auto"><table class="sales-table"><thead><tr>';
+  (parsed.headers || []).forEach(h => { html += `<th>${h}</th>`; });
+  html += '</tr></thead><tbody>';
+  displayRows.forEach(row => {
+    html += '<tr>';
+    (parsed.headers || []).forEach(h => { html += `<td>${row[h] || ''}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  if (parsed.rows.length > 50) {
+    html += `<p style="font-size:12px;color:#aaa;margin-top:8px">先頭50件を表示（全${parsed.rows.length}件）</p>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function renderComparison() {
+  const fmtYen = n => '¥' + Math.round(n).toLocaleString();
+  let totalSales = 0;
+  let totalTxn = 0;
+
+  ['nishishinjuku', 'sanchome', 'shibuya'].forEach(key => {
+    const d = storeData[key];
+    if (d) {
+      document.getElementById('cmp-' + key + '-sales').textContent = fmtYen(d.totalSales);
+      document.getElementById('cmp-' + key + '-txn').textContent = d.txnCount + '件';
+      totalSales += d.totalSales;
+      totalTxn += d.txnCount;
+    } else {
+      document.getElementById('cmp-' + key + '-sales').textContent = '—';
+      document.getElementById('cmp-' + key + '-txn').textContent = 'データなし';
+    }
+  });
+
+  const anyLoaded = Object.values(storeData).some(d => d !== null);
+  const totalCard = document.getElementById('totalSummaryCard');
+  if (anyLoaded) {
+    totalCard.style.display = 'block';
+    document.getElementById('totalSummaryContent').innerHTML =
+      `<p style="font-size:24px;font-weight:700">合計売上: ${fmtYen(totalSales)}</p>
+       <p style="color:#888;margin-top:4px">合計取引件数: ${totalTxn}件</p>`;
+  }
+}
+
+// ========================================
+// ダッシュボード — スプレッドシート連携
+// ========================================
+function saveSheetUrl() {
+  const url = document.getElementById('sheetCsvUrl').value;
+  localStorage.setItem('sheetCsvUrl', url);
+}
+
+async function fetchDashboardData() {
+  const url = document.getElementById('sheetCsvUrl').value.trim();
+  const dot = document.getElementById('syncDot');
+  const text = document.getElementById('syncText');
+
+  if (!url) {
+    text.textContent = '⚠ スプレッドシートURLを設定してください';
+    dot.className = 'sync-dot error';
+    return;
+  }
+
+  text.textContent = '取得中...';
+
+  try {
+    // CORS対策: Google Sheetsの公開CSVはno-corsで取得
+    const response = await fetch(url, { mode: 'cors', cache: 'no-cache' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const csvText = await response.text();
+    parseDashboardCsv(csvText);
+    const now = new Date();
+    text.textContent = '✅ 最終更新: ' + now.toLocaleTimeString('ja-JP');
+    dot.className = 'sync-dot ok';
+  } catch (err) {
+    text.textContent = '❌ 取得失敗: ' + err.message;
+    dot.className = 'sync-dot error';
+  }
+
+  updateNextUpdateTime();
+}
+
+function parseDashboardCsv(csvText) {
+  const lines = csvText.split('\n').map(l => l.trim()).filter(l => l);
+  // dashboardシートのフォーマット想定:
+  // 行1: ヘッダー (キー, 値)
+  // 行2: reservations, 数値
+  // 行3: staff_count, 数値
+  // 行4: staff_names, 名前1/名前2/...
+  const data = {};
+  lines.forEach(line => {
+    const cols = parseCsvLine(line);
+    if (cols.length >= 2) {
+      data[cols[0].trim()] = cols[1].trim();
+    }
+  });
+
+  if (data['reservations'] !== undefined) {
+    document.getElementById('dashReservations').textContent = data['reservations'];
+  }
+  if (data['staff_count'] !== undefined) {
+    document.getElementById('dashStaffCount').textContent = data['staff_count'];
+  }
+  if (data['staff_names'] !== undefined) {
+    const names = data['staff_names'].split('/').map(n => n.trim()).filter(n => n);
+    const container = document.getElementById('dashStaffList');
+    if (names.length > 0) {
+      container.innerHTML = names.map(n => `<span class="staff-chip">${n}</span>`).join('');
+    }
+  }
+}
+
+function updateNextUpdateTime() {
+  const now = new Date();
+  const slots = [10, 13, 17];
+  let next = null;
+  for (const h of slots) {
+    const t = new Date(now);
+    t.setHours(h, 0, 0, 0);
+    if (t > now) { next = t; break; }
+  }
+  if (!next) {
+    const t = new Date(now);
+    t.setDate(t.getDate() + 1);
+    t.setHours(10, 0, 0, 0);
+    next = t;
+  }
+  document.getElementById('dashNextUpdate').textContent =
+    next.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+function scheduleDashboardUpdates() {
+  fetchDashboardData(); // 初回即時取得
+  // 毎分チェックして 10:00 / 13:00 / 17:00 に自動更新
+  if (dashboardTimer) clearInterval(dashboardTimer);
+  dashboardTimer = setInterval(() => {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    if ((h === 10 || h === 13 || h === 17) && m === 0) {
+      fetchDashboardData();
+    }
+    updateNextUpdateTime();
+  }, 60000);
+  updateNextUpdateTime();
+}
+
+// ========================================
+// プロフィール — パスワード変更
+// ========================================
+function toggleEye(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+function changePassword() {
+  const current = document.getElementById('pwCurrent').value;
+  const newPw = document.getElementById('pwNew').value;
+  const confirm = document.getElementById('pwConfirm').value;
+  const msg = document.getElementById('pwMsg');
+  msg.className = 'form-msg';
+
+  const expected = getPassword(currentUser);
+  if (!current || current !== expected) {
+    msg.textContent = '現在のパスワードが正しくありません';
+    msg.className = 'form-msg error';
+    return;
+  }
+  if (newPw.length < 6) {
+    msg.textContent = '新しいパスワードは6文字以上にしてください';
+    msg.className = 'form-msg error';
+    return;
+  }
+  if (newPw !== confirm) {
+    msg.textContent = '新しいパスワードが一致しません';
+    msg.className = 'form-msg error';
+    return;
+  }
+  // localStorage に保存
+  localStorage.setItem('pw_' + currentUser, newPw);
+  msg.textContent = 'パスワードを変更しました。次回ログインから有効です。';
+  msg.className = 'form-msg success';
+  document.getElementById('pwCurrent').value = '';
+  document.getElementById('pwNew').value = '';
+  document.getElementById('pwConfirm').value = '';
+}
+
+// ========================================
+// 初期化
+// ========================================
+window.addEventListener('load', () => {
+  // Enter キーでログイン
+  document.getElementById('loginPass').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+</script>
+</body>
+</html>
