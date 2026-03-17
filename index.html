@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>サムライ美容室 — 社内システム</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     /* ===== Reset & Base ===== */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -710,6 +711,13 @@
 
 <script>
 // ========================================
+// Supabase 設定
+// ========================================
+const SUPABASE_URL = 'https://ifiamddyhbbrseglqesg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_nUMDcYGE4ZzkBQAiV0bvCQ_9t1bthno';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ========================================
 // データ定義
 // ========================================
 
@@ -799,6 +807,8 @@ function doLogin() {
     name === 'オーナー' ? 'flex' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
+  // Supabase から売上データを復元
+  loadFromSupabase();
 }
 
 function doLogout() {
@@ -893,15 +903,51 @@ function dzDropSingle(e, storeKey) {
 function loadStoreCsv(storeKey, file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     const text = e.target.result;
     const parsed = parseSquareCsv(text);
     storeData[storeKey] = parsed;
     document.getElementById('fn-' + storeKey).textContent = '✓ ' + file.name;
     renderStoreData(storeKey, parsed);
     renderComparison();
+    // Supabase に保存（既存データがあれば上書き）
+    await saveToSupabase(storeKey, file.name, parsed);
   };
   reader.readAsText(file, 'UTF-8');
+}
+
+async function saveToSupabase(storeKey, filename, parsed) {
+  const { error } = await sb.from('sales_data').upsert(
+    {
+      store_key: storeKey,
+      filename: filename,
+      data_json: parsed,
+      uploaded_at: new Date().toISOString(),
+      uploaded_by: currentUser || ''
+    },
+    { onConflict: 'store_key' }
+  );
+  if (error) {
+    console.error('Supabase保存エラー:', error.message);
+  } else {
+    console.log(storeKey + ' をSupabaseに保存しました');
+  }
+}
+
+async function loadFromSupabase() {
+  const { data, error } = await sb.from('sales_data').select('*');
+  if (error) { console.error('Supabase読み込みエラー:', error.message); return; }
+  if (!data || data.length === 0) return;
+  data.forEach(row => {
+    const key = row.store_key;
+    if (!storeData[key]) {
+      storeData[key] = row.data_json;
+      const fnEl = document.getElementById('fn-' + key);
+      if (fnEl && row.filename) fnEl.textContent = '✓ ' + row.filename + '（保存済）';
+      renderStoreData(key, row.data_json);
+    }
+  });
+  renderComparison();
 }
 
 function parseSquareCsv(text) {
