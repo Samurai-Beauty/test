@@ -358,7 +358,7 @@
     <h1>✂ SamuraiBeauty</h1>
     <p class="subtitle">社内管理システム</p>
     <label for="loginStore">店舗</label>
-    <select id="loginStore">
+    <select id="loginStore" onchange="updateLoginMembers(this.value)">
       <option value="">— 店舗を選択 —</option>
       <option value="honsha">本社</option>
       <option value="nishishinjuku">西新宿本店</option>
@@ -367,15 +367,7 @@
     </select>
     <label for="loginName">スタイリスト名</label>
     <select id="loginName">
-      <option value="">— 選択してください —</option>
-      <option value="オーナー">オーナー</option>
-      <option value="田中">田中</option>
-      <option value="鈴木">鈴木</option>
-      <option value="佐藤">佐藤</option>
-      <option value="山田">山田</option>
-      <option value="伊藤">伊藤</option>
-      <option value="渡辺">渡辺</option>
-      <option value="辰巳大地">辰巳大地</option>
+      <option value="">— 店舗を先に選択 —</option>
     </select>
     <label for="loginPass">パスワード</label>
     <input type="password" id="loginPass" placeholder="パスワードを入力">
@@ -410,6 +402,9 @@
       </div>
       <div class="nav-item" onclick="showSection('shift-view')" id="nav-shift-view">
         <span class="icon">👁</span><span>シフト閲覧</span>
+      </div>
+      <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
+        <span class="icon">👥</span><span>スタイリスト管理</span>
       </div>
       <div class="nav-divider"></div>
       <div class="nav-item" onclick="showSection('profile')" id="nav-profile">
@@ -702,6 +697,34 @@
         </div>
       </div>
 
+      <!-- ====== スタイリスト管理（本社のみ）====== -->
+      <div class="section" id="section-stylist-manage">
+        <div class="section-title">スタイリスト管理</div>
+
+        <!-- 新規追加フォーム -->
+        <div class="card">
+          <div class="card-title">➕ スタイリストを追加</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
+            <div>
+              <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">名前</label>
+              <input type="text" id="newStylistName" placeholder="例：山本花子" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">初期パスワード</label>
+              <input type="text" id="newStylistPass" placeholder="例：Samurai.2023" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px">
+            </div>
+            <button class="btn-primary" onclick="addStylist()" style="height:38px;white-space:nowrap">追加</button>
+          </div>
+          <div id="stylistAddMsg" style="font-size:13px;margin-top:8px;display:none"></div>
+        </div>
+
+        <!-- スタイリスト一覧 -->
+        <div class="card">
+          <div class="card-title">👥 現在のスタイリスト一覧</div>
+          <div id="stylistList"></div>
+        </div>
+      </div>
+
       <!-- ====== プロフィール ====== -->
       <div class="section" id="section-profile">
         <div class="section-title">プロフィール</div>
@@ -786,7 +809,27 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // データ定義
 // ========================================
 
-const ALL_MEMBERS = ['オーナー', '田中', '鈴木', '佐藤', '山田', '伊藤', '渡辺'];
+const STORE_MEMBERS = {
+  honsha:        ['辰巳大地', '齋藤香織'],
+  nishishinjuku: ['小川真央', '矢澤南奈', '清瀬陽香'],
+  sanchome:      ['岡部実結', '沖中真奈', '三浦さら'],
+  shibuya:       [], // 後で追加
+};
+const HONSHA_MEMBERS = STORE_MEMBERS.honsha;
+const DEFAULT_MEMBERS = [
+  ...STORE_MEMBERS.honsha,
+  ...STORE_MEMBERS.nishishinjuku,
+  ...STORE_MEMBERS.sanchome,
+  ...STORE_MEMBERS.shibuya,
+];
+
+// 全メンバー（デフォルト＋Supabaseカスタム）
+let customStylists = []; // { name, password }
+function getAllMembers() {
+  const names = customStylists.map(s => s.name);
+  return [...DEFAULT_MEMBERS, ...names.filter(n => !DEFAULT_MEMBERS.includes(n))];
+}
+const ALL_MEMBERS = DEFAULT_MEMBERS; // シフト管理などの後方互換用
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_CLS    = ['sun', '', '', '', '', '', 'sat'];
 
@@ -811,14 +854,17 @@ let modalDay         = null;
 
 // デフォルトパスワード（localStorage で上書き可能）
 const DEFAULT_PASSWORDS = {
-  'オーナー': 'owner123',
-  '田中': 'staff123',
-  '鈴木': 'staff123',
-  '佐藤': 'staff123',
-  '山田': 'staff123',
-  '伊藤': 'staff123',
-  '渡辺': 'staff123',
+  // 本社
   '辰巳大地': 'Samurai.2023',
+  '齋藤香織': 'Samurai.2023',
+  // 西新宿本店
+  '小川真央': 'Samurai.2023',
+  '矢澤南奈': 'Samurai.2023',
+  '清瀬陽香': 'Samurai.2023',
+  // 新宿三丁目
+  '岡部実結': 'Samurai.2023',
+  '沖中真奈': 'Samurai.2023',
+  '三浦さら': 'Samurai.2023',
 };
 
 // Squareの正式店舗名 → 内部キーの対応辞書
@@ -860,7 +906,99 @@ let dashboardTimer = null;
 // ログイン / ログアウト
 // ========================================
 function getPassword(name) {
-  return localStorage.getItem('pw_' + name) || DEFAULT_PASSWORDS[name] || null;
+  const lsOverride = localStorage.getItem('pw_' + name);
+  if (lsOverride) return lsOverride;
+  const custom = customStylists.find(s => s.name === name);
+  if (custom) return custom.password;
+  return DEFAULT_PASSWORDS[name] || null;
+}
+
+// ログイン画面：店舗選択で名前リストを更新
+function updateLoginMembers(storeKey) {
+  const select = document.getElementById('loginName');
+  const members = storeKey && STORE_MEMBERS[storeKey] && STORE_MEMBERS[storeKey].length > 0
+    ? STORE_MEMBERS[storeKey]
+    : getAllMembers();
+  const customForStore = customStylists.filter(s => !s.store || s.store === storeKey);
+  const allForStore = [...members, ...customForStore.map(s => s.name).filter(n => !members.includes(n))];
+  select.innerHTML = '<option value="">— 選択してください —</option>' +
+    allForStore.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
+// スタイリスト管理（Supabaseに保存）
+async function loadCustomStylists() {
+  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__stylists').maybeSingle();
+  if (data && data.data_json) {
+    customStylists = Array.isArray(data.data_json) ? data.data_json : [];
+  }
+}
+
+async function saveCustomStylists() {
+  await sb.from('sales_data').upsert({
+    store_key: '__stylists',
+    filename: 'stylists.json',
+    data_json: customStylists,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || ''
+  }, { onConflict: 'store_key' });
+}
+
+async function addStylist() {
+  const name = document.getElementById('newStylistName').value.trim();
+  const pass = document.getElementById('newStylistPass').value.trim();
+  const msg  = document.getElementById('stylistAddMsg');
+  msg.style.display = 'block';
+  if (!name || !pass) { msg.style.color = '#e74c3c'; msg.textContent = '名前とパスワードを入力してください'; return; }
+  if (getAllMembers().includes(name)) { msg.style.color = '#e74c3c'; msg.textContent = '同じ名前のスタイリストがすでに存在します'; return; }
+  customStylists.push({ name, password: pass });
+  await saveCustomStylists();
+  document.getElementById('newStylistName').value = '';
+  document.getElementById('newStylistPass').value = '';
+  msg.style.color = '#27ae60';
+  msg.textContent = `「${name}」を追加しました`;
+  renderStylistManage();
+}
+
+async function removeStylist(name) {
+  if (!confirm(`「${name}」を削除しますか？`)) return;
+  customStylists = customStylists.filter(s => s.name !== name);
+  await saveCustomStylists();
+  renderStylistManage();
+}
+
+function renderStylistManage() {
+  const list = document.getElementById('stylistList');
+  if (!list) return;
+  const allStores = Object.entries(STORE_MEMBERS);
+  let html = '';
+  allStores.forEach(([storeKey, members]) => {
+    if (members.length === 0 && storeKey !== 'shibuya') return;
+    html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:#0f3460;margin-bottom:8px">${STORE_LABELS[storeKey]}</div>`;
+    const storeCustom = customStylists.filter(s => s.store === storeKey);
+    const allM = [...members, ...storeCustom.map(s => s.name)];
+    if (allM.length === 0) { html += '<div style="color:#aaa;font-size:13px">メンバーなし</div>'; }
+    allM.forEach(name => {
+      const isCustom = customStylists.some(s => s.name === name);
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px">
+        <span style="font-size:14px">${name}</span>
+        ${isCustom ? `<button onclick="removeStylist('${name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : '<span style="font-size:11px;color:#aaa">固定</span>'}
+      </div>`;
+    });
+    html += '</div>';
+  });
+  // カスタムでstoreが未指定のもの
+  const unassigned = customStylists.filter(s => !s.store);
+  if (unassigned.length > 0) {
+    html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:#0f3460;margin-bottom:8px">未割り当て</div>`;
+    unassigned.forEach(s => {
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px">
+        <span style="font-size:14px">${s.name}</span>
+        <button onclick="removeStylist('${s.name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  list.innerHTML = html;
 }
 
 function doLogin() {
@@ -888,9 +1026,12 @@ function doLogin() {
   // オーナーのみシフト管理を表示
   document.getElementById('nav-shift-manage').style.display =
     name === 'オーナー' ? 'flex' : 'none';
-  // 本社メンバーのみ売上管理を表示
-  document.getElementById('nav-sales').style.display =
-    store === 'honsha' ? 'flex' : 'none';
+  // 本社のみ売上管理・スタイリスト管理を表示
+  const isHonsha = store === 'honsha';
+  document.getElementById('nav-sales').style.display = isHonsha ? 'flex' : 'none';
+  document.getElementById('nav-stylist-manage').style.display = isHonsha ? 'flex' : 'none';
+  // カスタムスタイリストをSupabaseから読込
+  loadCustomStylists();
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
   // Supabase から売上データを復元
@@ -918,6 +1059,7 @@ function showSection(name) {
   if (name === 'shift-request') renderShiftRequest();
   else if (name === 'shift-manage') renderShiftManage();
   else if (name === 'shift-view') renderShiftView();
+  else if (name === 'stylist-manage') renderStylistManage();
 }
 
 // ========================================
