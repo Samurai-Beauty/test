@@ -13,7 +13,7 @@
     /* ===== ログイン画面 ===== */
     #loginScreen {
       display: flex; align-items: center; justify-content: center;
-      min-height: 100vh; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh; background: linear-gradient(135deg, #d0d0d0 0%, #e0e0e0 50%, #f0f0f0 100%);
     }
     .login-box {
       background: white; border-radius: 16px; padding: 40px; width: 360px;
@@ -39,33 +39,33 @@
 
     /* ===== ヘッダー ===== */
     header {
-      background: #1a1a2e; color: white; padding: 0 24px;
+      background: #f0f0f0; color: #1a1a1a; padding: 0 24px;
       display: flex; align-items: center; justify-content: space-between;
       height: 56px; position: sticky; top: 0; z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
     }
-    header .brand { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
-    header .brand span { color: #e2b96f; }
-    header .user-info { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    header .brand { font-size: 18px; font-weight: 700; letter-spacing: .5px; color: #1a1a1a; }
+    header .brand span { color: #1a1a1a; }
+    header .user-info { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #333; }
     header .user-info .user-name { font-weight: 600; }
     .btn-logout {
-      background: transparent; border: 1.5px solid rgba(255,255,255,0.4); color: white;
+      background: transparent; border: 1.5px solid rgba(0,0,0,0.25); color: #333;
       padding: 5px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all .2s;
     }
-    .btn-logout:hover { background: rgba(255,255,255,0.1); }
+    .btn-logout:hover { background: rgba(0,0,0,0.06); }
 
     /* ===== サイドバー + コンテンツ ===== */
     .layout { display: flex; min-height: calc(100vh - 56px); }
     nav.sidebar {
-      width: 200px; background: #16213e; color: white; padding: 16px 0;
-      flex-shrink: 0;
+      width: 200px; background: #e8e8e8; color: #333; padding: 16px 0;
+      flex-shrink: 0; border-right: 1px solid #d0d0d0;
     }
     nav.sidebar .nav-item {
-      display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+      display: flex; align-items: center; gap: 10px; padding: 12px 20px; color: #444;
       cursor: pointer; font-size: 14px; transition: background .2s; border-left: 3px solid transparent;
     }
-    nav.sidebar .nav-item:hover { background: rgba(255,255,255,0.07); }
-    nav.sidebar .nav-item.active { background: rgba(255,255,255,0.12); border-left-color: #e2b96f; font-weight: 700; }
+    nav.sidebar .nav-item:hover { background: rgba(0,0,0,0.06); }
+    nav.sidebar .nav-item.active { background: rgba(0,0,0,0.1); border-left-color: #555; font-weight: 700; color: #1a1a1a; }
     nav.sidebar .nav-item .icon { font-size: 18px; }
 
     main.content { flex: 1; padding: 28px; overflow-y: auto; }
@@ -335,7 +335,7 @@
     .modal-actions { display: flex; gap: 8px; }
     .btn-cancel { flex: 1; padding: 9px; border-radius: 8px; border: 1.5px solid #ddd; cursor: pointer; background: white; font-size: 14px; }
     .btn-cancel:hover { background: #f8f9fa; }
-    .nav-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0; }
+    .nav-divider { border-top: 1px solid rgba(0,0,0,0.1); margin: 8px 0; }
 
     /* ===== モバイル対応 ===== */
     @media (max-width: 768px) {
