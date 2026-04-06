@@ -326,6 +326,14 @@
   <div class="login-box">
     <h1>✂ SamuraiBeauty</h1>
     <p class="subtitle">社内管理システム</p>
+    <label for="loginStore">店舗</label>
+    <select id="loginStore">
+      <option value="">— 店舗を選択 —</option>
+      <option value="honsha">本社</option>
+      <option value="nishishinjuku">西新宿本店</option>
+      <option value="sanchome">新宿三丁目</option>
+      <option value="shibuya">渋谷東</option>
+    </select>
     <label for="loginName">スタイリスト名</label>
     <select id="loginName">
       <option value="">— 選択してください —</option>
@@ -439,9 +447,10 @@
         <!-- タブ -->
         <div class="store-tabs">
           <div class="store-tab active" onclick="switchStoreTab('all')">📊 全店合計</div>
+          <div class="store-tab" onclick="switchStoreTab('honsha')">🏛 本社</div>
           <div class="store-tab" onclick="switchStoreTab('nishishinjuku')">🏠 西新宿本店</div>
           <div class="store-tab" onclick="switchStoreTab('sanchome')">🏢 新宿三丁目</div>
-          <div class="store-tab" onclick="switchStoreTab('shibuya')">🌿 渋谷東店</div>
+          <div class="store-tab" onclick="switchStoreTab('shibuya')">🌿 渋谷東</div>
         </div>
 
         <!-- 一括アップロード -->
@@ -465,7 +474,21 @@
           <div class="card-title">🏪 店舗別アップロード</div>
           <div class="store-drop-grid">
             <div class="store-drop-item">
-              <div class="store-label">西新宿本店（西新宿小滝橋通り）</div>
+              <div class="store-label">本社</div>
+              <div class="drop-zone" id="dz-honsha"
+                ondragover="dzDragOver(event,'dz-honsha')"
+                ondragleave="dzDragLeave('dz-honsha')"
+                ondrop="dzDropSingle(event,'honsha')"
+                onclick="document.getElementById('fi-honsha').click()">
+                <div class="dz-icon">📄</div>
+                <div class="dz-text">CSVをドロップ</div>
+              </div>
+              <div class="file-name" id="fn-honsha"></div>
+              <input type="file" id="fi-honsha" accept=".csv" style="display:none"
+                onchange="loadStoreCsv('honsha', this.files[0])">
+            </div>
+            <div class="store-drop-item">
+              <div class="store-label">西新宿本店</div>
               <div class="drop-zone" id="dz-nishishinjuku"
                 ondragover="dzDragOver(event,'dz-nishishinjuku')"
                 ondragleave="dzDragLeave('dz-nishishinjuku')"
@@ -493,7 +516,7 @@
                 onchange="loadStoreCsv('sanchome', this.files[0])">
             </div>
             <div class="store-drop-item">
-              <div class="store-label">渋谷東店（渋谷東）</div>
+              <div class="store-label">渋谷東</div>
               <div class="drop-zone" id="dz-shibuya"
                 ondragover="dzDragOver(event,'dz-shibuya')"
                 ondragleave="dzDragLeave('dz-shibuya')"
@@ -513,6 +536,11 @@
         <div id="storeContent-all">
           <div class="comparison-grid" id="comparisonGrid">
             <div class="store-summary-card">
+              <h3>🏛 本社</h3>
+              <div class="big-num" id="cmp-honsha-sales">—</div>
+              <div class="detail" id="cmp-honsha-txn">データなし</div>
+            </div>
+            <div class="store-summary-card">
               <h3>🏠 西新宿本店</h3>
               <div class="big-num" id="cmp-nishishinjuku-sales">—</div>
               <div class="detail" id="cmp-nishishinjuku-txn">データなし</div>
@@ -523,7 +551,7 @@
               <div class="detail" id="cmp-sanchome-txn">データなし</div>
             </div>
             <div class="store-summary-card">
-              <h3>🌿 渋谷東店</h3>
+              <h3>🌿 渋谷東</h3>
               <div class="big-num" id="cmp-shibuya-sales">—</div>
               <div class="detail" id="cmp-shibuya-txn">データなし</div>
             </div>
@@ -535,6 +563,12 @@
         </div>
 
         <!-- 各店舗タブコンテンツ -->
+        <div id="storeContent-honsha" style="display:none">
+          <div class="card" id="card-honsha">
+            <div class="card-title">本社 — 売上詳細</div>
+            <div id="data-honsha"><p style="color:#aaa">CSVをアップロードしてください</p></div>
+          </div>
+        </div>
         <div id="storeContent-nishishinjuku" style="display:none">
           <div class="card" id="card-nishishinjuku">
             <div class="card-title">西新宿本店 — 売上詳細</div>
@@ -549,7 +583,7 @@
         </div>
         <div id="storeContent-shibuya" style="display:none">
           <div class="card" id="card-shibuya">
-            <div class="card-title">渋谷東店 — 売上詳細</div>
+            <div class="card-title">渋谷東 — 売上詳細</div>
             <div id="data-shibuya"><p style="color:#aaa">CSVをアップロードしてください</p></div>
           </div>
         </div>
@@ -745,6 +779,9 @@ const DEFAULT_PASSWORDS = {
 
 // Squareの正式店舗名 → 内部キーの対応辞書
 const STORE_NAME_MAP = {
+  // 本社
+  '本社': 'honsha',
+  'honsha': 'honsha',
   // 西新宿本店
   '西新宿小滝橋通り': 'nishishinjuku',
   '西新宿': 'nishishinjuku',
@@ -764,13 +801,15 @@ const STORE_NAME_MAP = {
 };
 
 const STORE_LABELS = {
+  honsha: '本社',
   nishishinjuku: '西新宿本店',
   sanchome: '新宿三丁目',
-  shibuya: '渋谷東店',
+  shibuya: '渋谷東',
 };
 
 let currentUser = null;
-let storeData = { nishishinjuku: null, sanchome: null, shibuya: null };
+let currentStore = null;
+let storeData = { honsha: null, nishishinjuku: null, sanchome: null, shibuya: null };
 let dashboardTimer = null;
 
 // ========================================
@@ -781,17 +820,20 @@ function getPassword(name) {
 }
 
 function doLogin() {
+  const store = document.getElementById('loginStore').value;
   const name = document.getElementById('loginName').value;
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginError');
+  if (!store) { err.style.display = 'block'; err.textContent = '店舗を選択してください'; return; }
   if (!name) { err.style.display = 'block'; err.textContent = 'スタイリスト名を選択してください'; return; }
   const expected = getPassword(name);
   if (!expected || pass !== expected) { err.style.display = 'block'; err.textContent = 'パスワードが違います'; return; }
   err.style.display = 'none';
   currentUser = name;
+  currentStore = store;
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('headerUserName').textContent = name;
+  document.getElementById('headerUserName').textContent = STORE_LABELS[store] + ' | ' + name;
   document.getElementById('profileName').value = name;
   document.getElementById('profileRole').value = name === 'オーナー' ? 'オーナー' : 'スタイリスト';
   // スプレッドシートURL 復元
@@ -813,6 +855,7 @@ function doLogin() {
 
 function doLogout() {
   currentUser = null;
+  currentStore = null;
   clearInterval(dashboardTimer);
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -839,11 +882,11 @@ function showSection(name) {
 function switchStoreTab(storeKey) {
   // タブハイライト
   document.querySelectorAll('.store-tab').forEach((t, i) => {
-    const keys = ['all', 'nishishinjuku', 'sanchome', 'shibuya'];
+    const keys = ['all', 'honsha', 'nishishinjuku', 'sanchome', 'shibuya'];
     t.classList.toggle('active', keys[i] === storeKey);
   });
   // コンテンツ表示切り替え
-  ['all', 'nishishinjuku', 'sanchome', 'shibuya'].forEach(k => {
+  ['all', 'honsha', 'nishishinjuku', 'sanchome', 'shibuya'].forEach(k => {
     const el = document.getElementById('storeContent-' + k);
     if (el) el.style.display = k === storeKey ? 'block' : 'none';
   });
@@ -1053,7 +1096,7 @@ function renderComparison() {
   let totalSales = 0;
   let totalTxn = 0;
 
-  ['nishishinjuku', 'sanchome', 'shibuya'].forEach(key => {
+  ['honsha', 'nishishinjuku', 'sanchome', 'shibuya'].forEach(key => {
     const d = storeData[key];
     if (d) {
       document.getElementById('cmp-' + key + '-sales').textContent = fmtYen(d.totalSales);
