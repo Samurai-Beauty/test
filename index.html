@@ -463,11 +463,11 @@
 
         <!-- タブ -->
         <div class="store-tabs">
-          <div class="store-tab active" onclick="switchStoreTab('all')">📊 全店合計</div>
-          <div class="store-tab" onclick="switchStoreTab('honsha')">🏛 本社</div>
-          <div class="store-tab" onclick="switchStoreTab('nishishinjuku')">🏠 西新宿本店</div>
-          <div class="store-tab" onclick="switchStoreTab('sanchome')">🏢 新宿三丁目</div>
-          <div class="store-tab" onclick="switchStoreTab('shibuya')">🌿 渋谷東</div>
+          <div class="store-tab active" onclick="switchStoreTab('all')">全店合計</div>
+          <div class="store-tab" onclick="switchStoreTab('honsha')">本社</div>
+          <div class="store-tab" onclick="switchStoreTab('nishishinjuku')">西新宿本店</div>
+          <div class="store-tab" onclick="switchStoreTab('sanchome')">新宿三丁目</div>
+          <div class="store-tab" onclick="switchStoreTab('shibuya')">渋谷東</div>
         </div>
 
         <!-- 一括アップロード -->
@@ -553,22 +553,22 @@
         <div id="storeContent-all">
           <div class="comparison-grid" id="comparisonGrid">
             <div class="store-summary-card">
-              <h3>🏛 本社</h3>
+              <h3>本社</h3>
               <div class="big-num" id="cmp-honsha-sales">—</div>
               <div class="detail" id="cmp-honsha-txn">データなし</div>
             </div>
             <div class="store-summary-card">
-              <h3>🏠 西新宿本店</h3>
+              <h3>西新宿本店</h3>
               <div class="big-num" id="cmp-nishishinjuku-sales">—</div>
               <div class="detail" id="cmp-nishishinjuku-txn">データなし</div>
             </div>
             <div class="store-summary-card">
-              <h3>🏢 新宿三丁目</h3>
+              <h3>新宿三丁目</h3>
               <div class="big-num" id="cmp-sanchome-sales">—</div>
               <div class="detail" id="cmp-sanchome-txn">データなし</div>
             </div>
             <div class="store-summary-card">
-              <h3>🌿 渋谷東</h3>
+              <h3>渋谷東</h3>
               <div class="big-num" id="cmp-shibuya-sales">—</div>
               <div class="detail" id="cmp-shibuya-txn">データなし</div>
             </div>
@@ -1358,7 +1358,7 @@ function parseSummaryCsv(csvText) {
   document.getElementById('dashReservations').textContent = total || Object.values(storeMap).reduce((a,b)=>a+b,0);
 
   // 店舗別カード
-  const storeIcons = { '本社':'🏛','西新宿本店':'🏠','新宿三丁目':'🏢','渋谷東':'🌿' };
+  const storeIcons = {};
   const breakdown = document.getElementById('dashStoreBreakdown');
   if (Object.keys(storeMap).length === 0) {
     breakdown.innerHTML = '<div style="color:#aaa;font-size:13px;grid-column:1/-1">データなし（GASスクリプトを実行してください）</div>';
