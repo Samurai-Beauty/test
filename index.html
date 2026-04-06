@@ -647,6 +647,7 @@
               <button onclick="shiftReqNext()">&#8250;</button>
             </div>
             <span class="submit-badge pending" id="shiftReqBadge">未提出</span>
+            <span style="font-size:11px;color:#e74c3c;font-weight:600">※提出は前々月末日まで</span>
           </div>
           <button class="btn-primary" onclick="submitShiftRequest()">提出する</button>
         </div>
@@ -727,6 +728,7 @@
             <span class="month-label" id="shiftViewLabel"></span>
             <button onclick="shiftViewNext()">&#8250;</button>
           </div>
+          <span id="shiftViewStoreLabel" style="font-size:13px;font-weight:700;color:#555"></span>
           <span style="font-size:12px;color:#888">自分の名前は金色で表示</span>
         </div>
 
@@ -2071,12 +2073,25 @@ function renderShiftView() {
   notice.style.display = 'none';
   card.style.display = 'block';
 
+  // 在籍店舗のメンバーのみ表示（本社は全員）
+  const storeMembers = currentStore === 'honsha'
+    ? null
+    : (() => {
+        const base = STORE_MEMBERS[currentStore] || [];
+        const custom = customStylists.filter(s => s.store === currentStore).map(s => s.name);
+        return [...base, ...custom];
+      })();
+
+  const storeLabel = currentStore !== 'honsha' ? STORE_LABELS[currentStore] + 'のシフト' : '全店シフト';
+  document.getElementById('shiftViewStoreLabel').textContent = storeLabel;
+
   const sched = getSched(y, m);
   let html = '<div class="cal-grid">' + calHeader();
   buildCells(y, m).forEach(cell => {
     if (!cell) { html += '<div class="cal-cell empty"></div>'; return; }
     const { day, dow } = cell;
-    const staffList = sched[String(day)] || [];
+    const allStaff = sched[String(day)] || [];
+    const staffList = storeMembers ? allStaff.filter(n => storeMembers.includes(n)) : allStaff;
     let cls = 'cal-cell view-cell ' + WEEKDAY_CLS[dow];
     if (isToday(y, m, day)) cls += ' today';
     html += `<div class="${cls}">`;
