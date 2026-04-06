@@ -888,6 +888,9 @@ function doLogin() {
   // オーナーのみシフト管理を表示
   document.getElementById('nav-shift-manage').style.display =
     name === 'オーナー' ? 'flex' : 'none';
+  // 本社メンバーのみ売上管理を表示
+  document.getElementById('nav-sales').style.display =
+    store === 'honsha' ? 'flex' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
   // Supabase から売上データを復元
