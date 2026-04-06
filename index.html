@@ -688,9 +688,7 @@
 
         <!-- 店舗タブ -->
         <div class="store-tabs" style="margin-bottom:16px">
-          <div class="store-tab active" id="mstore-all"           onclick="switchManageStore('all')">全店</div>
-          <div class="store-tab" id="mstore-honsha"        onclick="switchManageStore('honsha')">本社</div>
-          <div class="store-tab" id="mstore-nishishinjuku" onclick="switchManageStore('nishishinjuku')">西新宿本店</div>
+          <div class="store-tab active" id="mstore-nishishinjuku" onclick="switchManageStore('nishishinjuku')">西新宿本店</div>
           <div class="store-tab" id="mstore-sanchome"      onclick="switchManageStore('sanchome')">新宿三丁目</div>
           <div class="store-tab" id="mstore-shibuya"       onclick="switchManageStore('shibuya')">渋谷東</div>
         </div>
@@ -937,7 +935,7 @@ let shiftReqMonth    = { y: 0, m: 0 };
 let shiftManageMonth = { y: 0, m: 0 };
 let shiftViewMonth   = { y: 0, m: 0 };
 let shiftManageTab   = 'requests';
-let shiftManageStore = 'all';
+let shiftManageStore = 'nishishinjuku';
 let modalDay         = null;
 
 // デフォルトパスワード（localStorage で上書き可能）
@@ -1893,7 +1891,7 @@ function renderManageReqTable(y, m) {
   const cnt = daysInMonth(y, m);
   const fd  = firstDow(y, m);
 
-  const storeLabel = shiftManageStore === 'all' ? '全店' : STORE_LABELS[shiftManageStore];
+  const storeLabel = STORE_LABELS[shiftManageStore] || '';
 
   // 提出状況チップ
   let statusHtml = `<div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px">${storeLabel}のスタッフ</div>`;
@@ -1964,7 +1962,7 @@ function renderManageSchedCal(y, m) {
 
 function switchManageStore(storeKey) {
   shiftManageStore = storeKey;
-  ['all','honsha','nishishinjuku','sanchome','shibuya'].forEach(k => {
+  ['nishishinjuku','sanchome','shibuya'].forEach(k => {
     const el = document.getElementById('mstore-' + k);
     if (el) el.classList.toggle('active', k === storeKey);
   });
@@ -1972,7 +1970,6 @@ function switchManageStore(storeKey) {
 }
 
 function getMembersForManage() {
-  if (shiftManageStore === 'all') return getAllMembers();
   const base = STORE_MEMBERS[shiftManageStore] || [];
   const custom = customStylists.filter(s => s.store === shiftManageStore).map(s => s.name);
   return [...base, ...custom];
@@ -2010,7 +2007,7 @@ function openModal(day) {
   const sched = getSched(y, m);
   const assigned = sched[String(day)] || [];
   const allReqs  = getAllReqs(y, m);
-  const storeLabel = shiftManageStore === 'all' ? '' : '（' + STORE_LABELS[shiftManageStore] + '）';
+  const storeLabel = STORE_LABELS[shiftManageStore] ? '（' + STORE_LABELS[shiftManageStore] + '）' : '';
   document.getElementById('modalDayLabel').textContent = day + '日 担当スタッフを選択' + storeLabel;
   const members = getMembersForManage();
   let html = '';
