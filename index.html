@@ -1452,16 +1452,25 @@ function openShiftPicker(day) {
   const req = getMyReq(y, m);
   const cur = req[String(day)] || '';
   shiftPickerDay = day;
-  document.getElementById('shiftPickerTitle').textContent = `${y}年${m}月${day}日`;
+
+  // 土日判定（0=日, 6=土）
+  const dow = new Date(y, m - 1, day).getDay();
+  const isWeekend = (dow === 0 || dow === 6);
+  const dowLabel = ['日','月','火','水','木','金','土'][dow];
+
+  document.getElementById('shiftPickerTitle').textContent = `${y}年${m}月${day}日（${dowLabel}）`;
+
   const list = document.getElementById('shiftOptionList');
-  list.innerHTML = SHIFT_OPTIONS.map(o => {
-    const isOff = o.key === 'off';
-    const sel = cur === o.key ? ' selected' : '';
-    return `<button class="shift-option-btn${isOff ? ' opt-off' : ''}${sel}" onclick="selectShiftOption('${o.key}')">
-      <span class="opt-label">${o.label}</span>
-      ${o.sub ? `<span class="opt-sub">${o.sub}</span>` : ''}
-    </button>`;
-  }).join('');
+  list.innerHTML = SHIFT_OPTIONS
+    .filter(o => isWeekend || (o.key !== 'h11-22' && o.key !== 'h11-17'))
+    .map(o => {
+      const isOff = o.key === 'off';
+      const sel = cur === o.key ? ' selected' : '';
+      return `<button class="shift-option-btn${isOff ? ' opt-off' : ''}${sel}" onclick="selectShiftOption('${o.key}')">
+        <span class="opt-label">${o.label}</span>
+        ${o.sub ? `<span class="opt-sub">${o.sub}</span>` : ''}
+      </button>`;
+    }).join('');
   document.getElementById('shiftPickerOverlay').style.display = 'flex';
 }
 
