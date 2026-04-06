@@ -989,6 +989,12 @@ const STORE_LABELS = {
   sanchome: '新宿三丁目',
   shibuya: '渋谷東',
 };
+const STORE_COLORS = {
+  nishishinjuku: '#1a7a4a',
+  sanchome:      '#6c3483',
+  shibuya:       '#0e6655',
+  honsha:        '#1a252f',
+};
 
 let currentUser = null;
 let currentStore = null;
@@ -2050,6 +2056,8 @@ function renderManageSchedCal(y, m) {
   const allReqs = getAllReqs(y, m);
   const schedTimes = getSchedTimes(y, m);
 
+  const multiStore = shiftManageStore.length > 1;
+
   let html = '<div class="cal-grid">' + calHeader();
   buildCells(y, m).forEach(cell => {
     if (!cell) { html += '<div class="cal-cell empty"></div>'; return; }
@@ -2062,13 +2070,34 @@ function renderManageSchedCal(y, m) {
     html += `<div class="day-num"><span>${day}</span>`;
     html += `<button class="sched-add-btn" style="width:auto;padding:1px 5px;margin:0;display:inline-block" onclick="openModal(${day})">＋</button></div>`;
     html += '<div class="staff-tags">';
-    staffList.forEach(name => {
-      const reqKey = dayTimes[name] || (allReqs[name] || {})[String(day)];
-      const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
-      const c = reqKey ? getShiftColor(reqKey) : { bg: '#0f3460', text: '#fff' };
-      const timeLabel = opt ? `<span style="font-size:8px;opacity:0.9;display:block">${opt.label}</span>` : '';
-      html += `<span class="staff-tag" onclick="removeSchedStaff(${day},'${name}')" style="background:${c.bg};color:${c.text};padding:3px 6px;line-height:1.3">${name} ×${timeLabel}</span>`;
-    });
+
+    if (multiStore) {
+      // 店舗ごとにグループ表示
+      shiftManageStore.forEach((store, si) => {
+        const storeMembers = getMembersOfStore(store);
+        const storeStaff = staffList.filter(n => storeMembers.includes(n));
+        if (storeStaff.length === 0) return;
+        const sc = STORE_COLORS[store] || '#555';
+        if (si > 0) html += `<div style="width:100%;margin:4px 0 2px;border-top:1px dashed #ddd"></div>`;
+        html += `<div style="width:100%;font-size:9px;font-weight:800;color:${sc};margin-bottom:2px;letter-spacing:.3px">${STORE_LABELS[store]}</div>`;
+        storeStaff.forEach(name => {
+          const reqKey = dayTimes[name] || (allReqs[name] || {})[String(day)];
+          const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
+          const c = reqKey ? getShiftColor(reqKey) : { bg: '#0f3460', text: '#fff' };
+          const timeLabel = opt ? `<span style="font-size:8px;opacity:0.9;display:block">${opt.label}</span>` : '';
+          html += `<span class="staff-tag" onclick="removeSchedStaff(${day},'${name}')" style="background:${c.bg};color:${c.text};padding:3px 6px;line-height:1.3;border-left:3px solid ${sc}">${name} ×${timeLabel}</span>`;
+        });
+      });
+    } else {
+      staffList.forEach(name => {
+        const reqKey = dayTimes[name] || (allReqs[name] || {})[String(day)];
+        const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
+        const c = reqKey ? getShiftColor(reqKey) : { bg: '#0f3460', text: '#fff' };
+        const timeLabel = opt ? `<span style="font-size:8px;opacity:0.9;display:block">${opt.label}</span>` : '';
+        html += `<span class="staff-tag" onclick="removeSchedStaff(${day},'${name}')" style="background:${c.bg};color:${c.text};padding:3px 6px;line-height:1.3">${name} ×${timeLabel}</span>`;
+      });
+    }
+
     html += '</div></div>';
   });
   html += '</div>';
@@ -2115,12 +2144,15 @@ function switchManageStore(storeKey) {
   renderShiftManage();
 }
 
+function getMembersOfStore(store) {
+  const base = STORE_MEMBERS[store] || [];
+  const custom = customStylists.filter(s => s.store === store).map(s => s.name);
+  return [...base, ...custom];
+}
 function getMembersForManage() {
   const result = [];
   shiftManageStore.forEach(store => {
-    const base = STORE_MEMBERS[store] || [];
-    const custom = customStylists.filter(s => s.store === store).map(s => s.name);
-    [...base, ...custom].forEach(n => { if (!result.includes(n)) result.push(n); });
+    getMembersOfStore(store).forEach(n => { if (!result.includes(n)) result.push(n); });
   });
   return result;
 }
