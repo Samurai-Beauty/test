@@ -284,6 +284,37 @@
     }
     .view-staff-chip.me { background: #e2b96f; color: #1a1a2e; font-weight: 700; }
 
+    /* シフトピッカーモーダル */
+    .shift-picker-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .shift-picker-box {
+      background: white; border-radius: 20px 20px 0 0; padding: 20px 16px 32px;
+      width: 100%; max-width: 480px; box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .shift-picker-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; text-align: center; }
+    .shift-option-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .shift-option-btn {
+      padding: 12px 16px; border-radius: 10px; border: 2px solid #e0e0e0;
+      cursor: pointer; text-align: left; background: white; transition: all .15s;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .shift-option-btn:hover { border-color: #0f3460; background: #f0f4ff; }
+    .shift-option-btn.selected { border-color: #0f3460; background: #0f3460; color: white; }
+    .shift-option-btn .opt-label { font-size: 14px; font-weight: 700; }
+    .shift-option-btn .opt-sub { font-size: 11px; opacity: .7; }
+    .shift-option-btn.opt-off { border-color: #e74c3c; }
+    .shift-option-btn.opt-off:hover { background: #fde8e8; }
+    .shift-option-btn.opt-off.selected { background: #e74c3c; border-color: #e74c3c; color: white; }
+    .shift-picker-clear {
+      width: 100%; padding: 10px; border-radius: 8px; border: 1.5px solid #ddd;
+      cursor: pointer; background: white; font-size: 13px; color: #888;
+    }
+    .shift-picker-clear:hover { background: #f8f9fa; }
+
     /* スタッフ選択モーダル */
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -608,11 +639,11 @@
 
         <div class="card" style="padding:14px 20px;margin-bottom:16px">
           <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;color:#555">凡例 / タップで切り替え:</span>
-            <span style="display:flex;align-items:center;gap:6px;font-size:12px">
-              <span style="background:#f8f9fa;border:2px solid #ddd;border-radius:4px;padding:2px 8px;color:#888">未回答</span>→
-              <span style="background:#d4edda;border:2px solid #27ae60;border-radius:4px;padding:2px 8px;color:#155724;font-weight:700">出勤希望</span>→
-              <span style="background:#fde8e8;border:2px solid #e74c3c;border-radius:4px;padding:2px 8px;color:#721c24;font-weight:700">休み希望</span>
+            <span style="font-size:13px;font-weight:700;color:#555">日付をタップして時間を選択</span>
+            <span style="display:flex;align-items:center;gap:8px;font-size:12px">
+              <span style="background:#d4edda;border:2px solid #27ae60;border-radius:4px;padding:2px 8px;color:#155724;font-weight:700">出勤</span>
+              <span style="background:#fde8e8;border:2px solid #e74c3c;border-radius:4px;padding:2px 8px;color:#721c24;font-weight:700">休日希望</span>
+              <span style="background:#f8f9fa;border:2px solid #ddd;border-radius:4px;padding:2px 8px;color:#888">未回答</span>
             </span>
           </div>
           <div class="shift-summary" id="shiftReqSummary" style="margin-top:10px"></div>
@@ -744,6 +775,15 @@
   </div>
 </div>
 
+<!-- ====== シフトピッカーモーダル ====== -->
+<div class="shift-picker-overlay" id="shiftPickerOverlay" style="display:none" onclick="closeShiftPicker(event)">
+  <div class="shift-picker-box" onclick="event.stopPropagation()">
+    <div class="shift-picker-title" id="shiftPickerTitle">日付を選択</div>
+    <div class="shift-option-list" id="shiftOptionList"></div>
+    <button class="shift-picker-clear" onclick="selectShiftOption('')">未回答に戻す</button>
+  </div>
+</div>
+
 <script>
 // ========================================
 // Supabase 設定
@@ -759,6 +799,16 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ALL_MEMBERS = ['オーナー', '田中', '鈴木', '佐藤', '山田', '伊藤', '渡辺'];
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_CLS    = ['sun', '', '', '', '', '', 'sat'];
+
+const SHIFT_OPTIONS = [
+  { key: 'h11-22',  label: '11:00-22:00', sub: '土日祝のみ' },
+  { key: 'h11-17',  label: '11:00-17:00', sub: '土日祝のみ' },
+  { key: 'early',   label: '13:00-18:00', sub: '早番' },
+  { key: 'late',    label: '16:00-22:00', sub: '遅番' },
+  { key: 'full',    label: '13:00-22:00', sub: '平日フル' },
+  { key: 'omakase', label: 'お任せシフト', sub: '' },
+  { key: 'off',     label: '休日希望',     sub: '' },
+];
 
 // シフト月状態
 let shiftReqMonth    = { y: 0, m: 0 };
@@ -1360,8 +1410,8 @@ function renderShiftRequest() {
   const cnt = daysInMonth(y, m);
   for (let d = 1; d <= cnt; d++) {
     const s = req[String(d)] || '';
-    if (s === 'work') workCount++;
-    else if (s === 'off') offCount++;
+    if (s === 'off') offCount++;
+    else if (s !== '') workCount++;
     else noneCount++;
   }
   document.getElementById('shiftReqSummary').innerHTML =
@@ -1378,27 +1428,61 @@ function renderShiftRequest() {
     const past = isPast(y, m, day);
     let cls = 'cal-cell ' + WEEKDAY_CLS[dow];
     if (isToday(y, m, day)) cls += ' today';
-    if (state === 'work') cls += ' state-work';
-    else if (state === 'off') cls += ' state-off';
+    if (state === 'off') cls += ' state-off';
+    else if (state !== '') cls += ' state-work';
     else cls += ' state-empty';
     if (past) cls += ' past';
-    const label = state === 'work' ? '出勤希望' : state === 'off' ? '休み希望' : '未回答';
-    const click = past ? '' : `onclick="toggleReqDay(${day})"`;
+    const opt = SHIFT_OPTIONS.find(o => o.key === state);
+    let badgeHtml = '';
+    if (opt) {
+      badgeHtml = `<span class="state-badge">${opt.label}</span>`;
+      if (opt.sub) badgeHtml += `<br><span style="font-size:9px;color:inherit;opacity:.8">${opt.sub}</span>`;
+    } else {
+      badgeHtml = `<span class="state-badge">未回答</span>`;
+    }
+    const click = past ? '' : `onclick="openShiftPicker(${day})"`;
     html += `<div class="${cls}" ${click}>`;
     html += `<div class="day-num">${day}</div>`;
-    html += `<span class="state-badge">${label}</span></div>`;
+    html += badgeHtml + '</div>';
   });
   html += '</div>';
   document.getElementById('shiftReqCalendar').innerHTML = html;
 }
 
-function toggleReqDay(day) {
+let shiftPickerDay = null;
+
+function openShiftPicker(day) {
   const { y, m } = shiftReqMonth;
   const req = getMyReq(y, m);
   const cur = req[String(day)] || '';
-  req[String(day)] = cur === '' ? 'work' : cur === 'work' ? 'off' : '';
+  shiftPickerDay = day;
+  document.getElementById('shiftPickerTitle').textContent = `${y}年${m}月${day}日`;
+  const list = document.getElementById('shiftOptionList');
+  list.innerHTML = SHIFT_OPTIONS.map(o => {
+    const isOff = o.key === 'off';
+    const sel = cur === o.key ? ' selected' : '';
+    return `<button class="shift-option-btn${isOff ? ' opt-off' : ''}${sel}" onclick="selectShiftOption('${o.key}')">
+      <span class="opt-label">${o.label}</span>
+      ${o.sub ? `<span class="opt-sub">${o.sub}</span>` : ''}
+    </button>`;
+  }).join('');
+  document.getElementById('shiftPickerOverlay').style.display = 'flex';
+}
+
+function selectShiftOption(key) {
+  if (shiftPickerDay === null) return;
+  const { y, m } = shiftReqMonth;
+  const req = getMyReq(y, m);
+  req[String(shiftPickerDay)] = key;
   saveMyReq(y, m, req);
+  closeShiftPicker();
   renderShiftRequest();
+}
+
+function closeShiftPicker(e) {
+  if (e && e.target !== document.getElementById('shiftPickerOverlay')) return;
+  document.getElementById('shiftPickerOverlay').style.display = 'none';
+  shiftPickerDay = null;
 }
 
 function shiftReqPrev() {
