@@ -639,7 +639,7 @@
         </div>
       </div>
 
-      <!-- ====== シフト管理（オーナー専用）====== -->
+      <!-- ====== シフト管理（本社専用）====== -->
       <div class="section" id="section-shift-manage">
         <div class="section-title">シフト管理</div>
 
@@ -1017,15 +1017,15 @@ function doLogin() {
   document.getElementById('app').style.display = 'block';
   document.getElementById('headerUserName').textContent = STORE_LABELS[store] + ' | ' + name;
   document.getElementById('profileName').value = name;
-  document.getElementById('profileRole').value = name === 'オーナー' ? 'オーナー' : 'スタイリスト';
+  document.getElementById('profileRole').value = store === 'honsha' ? '本社' : 'スタイリスト';
   // シフト月初期化
   const _t = new Date();
   shiftReqMonth    = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
-  // オーナーのみシフト管理を表示
+  // 本社のみシフト管理を表示
   document.getElementById('nav-shift-manage').style.display =
-    name === 'オーナー' ? 'flex' : 'none';
+    store === 'honsha' ? 'flex' : 'none';
   // 本社のみ売上管理・スタイリスト管理を表示
   const isHonsha = store === 'honsha';
   document.getElementById('nav-sales').style.display = isHonsha ? 'flex' : 'none';
@@ -1654,7 +1654,7 @@ function submitShiftRequest() {
 }
 
 // ========================================
-// シフト管理（オーナー専用）
+// シフト管理（本社専用）
 // ========================================
 
 function renderShiftManage() {
