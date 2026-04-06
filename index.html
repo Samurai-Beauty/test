@@ -407,7 +407,7 @@
   <div class="layout">
     <nav class="sidebar">
       <div class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
-        <span class="icon">📊</span><span>ダッシュボード</span>
+        <span class="icon">🏠</span><span>ホーム</span>
       </div>
       <div class="nav-item" onclick="showSection('sales')" id="nav-sales">
         <span class="icon">💴</span><span>売上管理</span>
@@ -436,9 +436,15 @@
     </nav>
     <main class="content">
 
-      <!-- ====== ダッシュボード ====== -->
+      <!-- ====== ホーム ====== -->
       <div class="section active" id="section-dashboard">
-        <div class="section-title">ダッシュボード</div>
+        <div class="section-title">ホーム</div>
+
+        <!-- お知らせ -->
+        <div class="card">
+          <div class="card-title">📢 お知らせ</div>
+          <div id="homeNoticeList"><div style="color:#aaa;font-size:13px;text-align:center;padding:20px">お知らせはまだありません</div></div>
+        </div>
 
         <!-- 同期バー -->
         <div class="sync-bar">
@@ -1074,6 +1080,28 @@ function switchNoticeTab(tab) {
   if (tab === 'edit') renderNoticeEditList();
 }
 
+function renderHomeNotice() {
+  const container = document.getElementById('homeNoticeList');
+  if (!container) return;
+  if (notices.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:20px">お知らせはまだありません</div>';
+    return;
+  }
+  const sorted = [...notices].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return new Date(b.date) - new Date(a.date);
+  }).slice(0, 5); // 最新5件
+  container.innerHTML = sorted.map(n => `
+    <div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        ${n.pinned ? '<span class="pin-badge">📌</span>' : ''}
+        <span style="font-size:14px;font-weight:700;color:#1a1a1a">${escHtml(n.title)}</span>
+      </div>
+      <div style="font-size:11px;color:#aaa">${n.date} ／ ${escHtml(n.author)}</div>
+      <div style="font-size:13px;color:#555;margin-top:4px;white-space:pre-wrap">${escHtml(n.content)}</div>
+    </div>`).join('');
+}
+
 function renderNoticeList() {
   const container = document.getElementById('noticeList');
   if (notices.length === 0) {
@@ -1118,6 +1146,7 @@ async function postNotice() {
   const content = document.getElementById('noticeContent').value.trim();
   const pinned  = document.getElementById('noticePinned').checked;
   const msg     = document.getElementById('noticePostMsg');
+
   msg.style.display = 'block';
   if (!title || !content) { msg.style.color = '#e74c3c'; msg.textContent = 'タイトルと内容を入力してください'; return; }
   const notice = {
@@ -1135,6 +1164,7 @@ async function postNotice() {
   setTimeout(() => { msg.style.display = 'none'; }, 2000);
   renderNoticeEditList();
   renderNoticeList();
+  renderHomeNotice();
 }
 
 async function deleteNotice(id) {
@@ -1143,6 +1173,7 @@ async function deleteNotice(id) {
   await saveNotices();
   renderNoticeEditList();
   renderNoticeList();
+  renderHomeNotice();
 }
 
 function renderStylistManage() {
@@ -1212,7 +1243,7 @@ function doLogin() {
   // カスタムスタイリストをSupabaseから読込
   loadCustomStylists();
   // お知らせ読み込み・本社は編集タブ表示
-  loadNotices().then(() => renderNoticeList());
+  loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); });
   document.getElementById('noticeTabBar').style.display = isHonsha ? 'block' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
