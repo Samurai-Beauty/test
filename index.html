@@ -942,7 +942,7 @@ let shiftReqMonth    = { y: 0, m: 0 };
 let shiftManageMonth = { y: 0, m: 0 };
 let shiftViewMonth   = { y: 0, m: 0 };
 let shiftManageTab   = 'requests';
-let shiftManageStore = 'nishishinjuku';
+let shiftManageStore = ['nishishinjuku'];
 let modalDay         = null;
 
 // デフォルトパスワード（localStorage で上書き可能）
@@ -1961,7 +1961,7 @@ function renderManageReqTable(y, m) {
   const cnt = daysInMonth(y, m);
   const fd  = firstDow(y, m);
 
-  const storeLabel = STORE_LABELS[shiftManageStore] || '';
+  const storeLabel = shiftManageStore.map(k => STORE_LABELS[k]).join('・');
 
   // 提出状況チップ
   let statusHtml = `<div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px">${storeLabel}のスタッフ</div>`;
@@ -2060,18 +2060,28 @@ function applyRequestsToSchedule() {
 }
 
 function switchManageStore(storeKey) {
-  shiftManageStore = storeKey;
+  const idx = shiftManageStore.indexOf(storeKey);
+  if (idx >= 0) {
+    if (shiftManageStore.length === 1) return; // 最低1店舗は選択維持
+    shiftManageStore.splice(idx, 1);
+  } else {
+    shiftManageStore.push(storeKey);
+  }
   ['nishishinjuku','sanchome','shibuya'].forEach(k => {
     const el = document.getElementById('mstore-' + k);
-    if (el) el.classList.toggle('active', k === storeKey);
+    if (el) el.classList.toggle('active', shiftManageStore.includes(k));
   });
   renderShiftManage();
 }
 
 function getMembersForManage() {
-  const base = STORE_MEMBERS[shiftManageStore] || [];
-  const custom = customStylists.filter(s => s.store === shiftManageStore).map(s => s.name);
-  return [...base, ...custom];
+  const result = [];
+  shiftManageStore.forEach(store => {
+    const base = STORE_MEMBERS[store] || [];
+    const custom = customStylists.filter(s => s.store === store).map(s => s.name);
+    [...base, ...custom].forEach(n => { if (!result.includes(n)) result.push(n); });
+  });
+  return result;
 }
 
 function switchManageTab(tab) {
@@ -2106,7 +2116,7 @@ function openModal(day) {
   const sched = getSched(y, m);
   const assigned = sched[String(day)] || [];
   const allReqs  = getAllReqs(y, m);
-  const storeLabel = STORE_LABELS[shiftManageStore] ? '（' + STORE_LABELS[shiftManageStore] + '）' : '';
+  const storeLabel = '（' + shiftManageStore.map(k => STORE_LABELS[k]).join('・') + '）';
   document.getElementById('modalDayLabel').textContent = day + '日 担当スタッフを選択' + storeLabel;
   const members = getMembersForManage();
   let html = '';
