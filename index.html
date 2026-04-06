@@ -666,6 +666,7 @@
       <div class="section" id="section-shift-manage">
         <div class="section-title">シフト管理</div>
 
+        <!-- 月ナビ -->
         <div class="shift-status-bar">
           <div class="month-nav">
             <button onclick="shiftManagePrev()">&#8249;</button>
@@ -676,6 +677,15 @@
             <div class="store-tab active" id="manageTabReq" onclick="switchManageTab('requests')">📋 希望一覧</div>
             <div class="store-tab" id="manageTabSched" onclick="switchManageTab('schedule')">✏️ シフト作成</div>
           </div>
+        </div>
+
+        <!-- 店舗タブ -->
+        <div class="store-tabs" style="margin-bottom:16px">
+          <div class="store-tab active" id="mstore-all"           onclick="switchManageStore('all')">全店</div>
+          <div class="store-tab" id="mstore-honsha"        onclick="switchManageStore('honsha')">本社</div>
+          <div class="store-tab" id="mstore-nishishinjuku" onclick="switchManageStore('nishishinjuku')">西新宿本店</div>
+          <div class="store-tab" id="mstore-sanchome"      onclick="switchManageStore('sanchome')">新宿三丁目</div>
+          <div class="store-tab" id="mstore-shibuya"       onclick="switchManageStore('shibuya')">渋谷東</div>
         </div>
 
         <!-- 希望一覧 -->
@@ -919,6 +929,7 @@ let shiftReqMonth    = { y: 0, m: 0 };
 let shiftManageMonth = { y: 0, m: 0 };
 let shiftViewMonth   = { y: 0, m: 0 };
 let shiftManageTab   = 'requests';
+let shiftManageStore = 'all';
 let modalDay         = null;
 
 // デフォルトパスワード（localStorage で上書き可能）
@@ -1844,13 +1855,17 @@ function renderShiftManage() {
 }
 
 function renderManageReqTable(y, m) {
-  const allReqs = getAllReqs(y, m);
+  const allReqs  = getAllReqs(y, m);
+  const members  = getMembersForManage();
   const cnt = daysInMonth(y, m);
-  const fd = firstDow(y, m);
+  const fd  = firstDow(y, m);
+
+  const storeLabel = shiftManageStore === 'all' ? '全店' : STORE_LABELS[shiftManageStore];
 
   // 提出状況チップ
-  let statusHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
-  ALL_MEMBERS.forEach(name => {
+  let statusHtml = `<div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px">${storeLabel}のスタッフ</div>`;
+  statusHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
+  members.forEach(name => {
     const done = isSubmitted(y, m, name);
     statusHtml += `<span style="font-size:12px;padding:3px 12px;border-radius:20px;font-weight:700;` +
       `background:${done ? '#d4edda' : '#f8f9fa'};color:${done ? '#155724' : '#aaa'}">` +
@@ -1858,9 +1873,14 @@ function renderManageReqTable(y, m) {
   });
   statusHtml += '</div>';
 
+  if (members.length === 0) {
+    document.getElementById('manageReqTable').innerHTML = statusHtml + '<p style="color:#aaa">このストアにはメンバーがいません</p>';
+    return;
+  }
+
   let html = statusHtml + '<div class="req-table-wrap"><table class="req-table"><thead><tr>';
   html += '<th>日付</th>';
-  ALL_MEMBERS.forEach(n => { html += `<th>${n}</th>`; });
+  members.forEach(n => { html += `<th>${n}</th>`; });
   html += '</tr></thead><tbody>';
 
   for (let d = 1; d <= cnt; d++) {
@@ -1869,10 +1889,11 @@ function renderManageReqTable(y, m) {
     const rowCls = dow === 0 ? 'weekend-sun' : dow === 6 ? 'weekend-sat' : '';
     const colStyle = dow === 0 ? 'color:#e74c3c' : dow === 6 ? 'color:#3498db' : '';
     html += `<tr class="${rowCls}"><td class="day-cell" style="${colStyle}">${d}日(${dowLabel})</td>`;
-    ALL_MEMBERS.forEach(name => {
+    members.forEach(name => {
       const state = (allReqs[name] || {})[String(d)] || '';
-      if (state === 'work') html += '<td><span class="req-work">出勤</span></td>';
-      else if (state === 'off') html += '<td><span class="req-off">休み</span></td>';
+      const opt = SHIFT_OPTIONS.find(o => o.key === state);
+      if (state === 'off') html += '<td><span class="req-off">休み</span></td>';
+      else if (opt) html += `<td><span class="req-work" style="font-size:9px">${opt.label}</span></td>`;
       else html += '<td><span class="req-none">—</span></td>';
     });
     html += '</tr>';
@@ -1908,6 +1929,22 @@ function renderManageSchedCal(y, m) {
   document.getElementById('manageSchedCalendar').innerHTML = html;
 }
 
+function switchManageStore(storeKey) {
+  shiftManageStore = storeKey;
+  ['all','honsha','nishishinjuku','sanchome','shibuya'].forEach(k => {
+    const el = document.getElementById('mstore-' + k);
+    if (el) el.classList.toggle('active', k === storeKey);
+  });
+  renderShiftManage();
+}
+
+function getMembersForManage() {
+  if (shiftManageStore === 'all') return getAllMembers();
+  const base = STORE_MEMBERS[shiftManageStore] || [];
+  const custom = customStylists.filter(s => s.store === shiftManageStore).map(s => s.name);
+  return [...base, ...custom];
+}
+
 function switchManageTab(tab) {
   shiftManageTab = tab;
   document.getElementById('manageTabReq').classList.toggle('active', tab === 'requests');
@@ -1940,12 +1977,15 @@ function openModal(day) {
   const sched = getSched(y, m);
   const assigned = sched[String(day)] || [];
   const allReqs  = getAllReqs(y, m);
-  document.getElementById('modalDayLabel').textContent = day + '日 担当スタッフを選択';
+  const storeLabel = shiftManageStore === 'all' ? '' : '（' + STORE_LABELS[shiftManageStore] + '）';
+  document.getElementById('modalDayLabel').textContent = day + '日 担当スタッフを選択' + storeLabel;
+  const members = getMembersForManage();
   let html = '';
-  ALL_MEMBERS.forEach(name => {
+  members.forEach(name => {
     const sel = assigned.includes(name);
     const req = (allReqs[name] || {})[String(day)] || '';
-    const hint = req === 'work' ? ' 🟢' : req === 'off' ? ' 🔴' : '';
+    const opt = SHIFT_OPTIONS.find(o => o.key === req);
+    const hint = req === 'off' ? ' 🔴' : opt ? ' 🟢' : '';
     html += `<button class="modal-staff-btn ${sel ? 'selected' : ''}" data-name="${name}" onclick="this.classList.toggle('selected')">`;
     html += name + hint + '</button>';
   });
