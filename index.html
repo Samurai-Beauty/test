@@ -431,43 +431,33 @@
           <button class="btn-refresh" onclick="fetchDashboardData()">🔄 手動更新</button>
         </div>
 
-        <!-- スプレッドシート設定 -->
-        <div class="card" id="sheetConfigCard">
-          <div class="card-title">📋 Googleスプレッドシート設定</div>
-          <div class="sheet-config">
-            <label>スプレッドシートCSV公開URL（dashboardシート）</label>
-            <input type="url" id="sheetCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/XXXXX/export?format=csv&gid=XXXXX"
-              oninput="saveSheetUrl()">
-          </div>
-          <p style="font-size:12px;color:#aaa;margin-top:8px;">
-            スプレッドシートを「ファイル → 共有 → ウェブに公開」してCSV形式のURLを貼り付けてください
-          </p>
-        </div>
-
-        <!-- KPIカード -->
+        <!-- 合計KPI -->
         <div class="dash-grid">
           <div class="dash-card">
-            <div class="label">本日の予約数</div>
+            <div class="label">本日の予約数（全店合計）</div>
             <div class="value" id="dashReservations">—</div>
             <div class="unit">件</div>
           </div>
           <div class="dash-card">
-            <div class="label">出勤人数</div>
-            <div class="value" id="dashStaffCount">—</div>
-            <div class="unit">名</div>
-          </div>
-          <div class="dash-card">
-            <div class="label">次回更新</div>
+            <div class="label">次回自動更新</div>
             <div class="value" id="dashNextUpdate" style="font-size:20px">—</div>
             <div class="unit"></div>
           </div>
         </div>
 
-        <!-- 出勤スタッフ -->
+        <!-- 店舗別予約数 -->
         <div class="card">
-          <div class="card-title">👥 本日の出勤スタッフ</div>
-          <div class="staff-list" id="dashStaffList">
-            <span style="color:#aaa;font-size:13px">データ未取得</span>
+          <div class="card-title">🏪 店舗別 本日の予約数</div>
+          <div id="dashStoreBreakdown" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:4px 0">
+            <div style="color:#aaa;font-size:13px;grid-column:1/-1">データ未取得</div>
+          </div>
+        </div>
+
+        <!-- 最終更新時刻 -->
+        <div class="card" style="padding:12px 20px">
+          <div style="font-size:12px;color:#aaa">
+            📊 データソース: Googleスプレッドシート（GAS自動集計）
+            <span id="dashLastUpdated"></span>
           </div>
         </div>
       </div>
@@ -799,6 +789,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ALL_MEMBERS = ['オーナー', '田中', '鈴木', '佐藤', '山田', '伊藤', '渡辺'];
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_CLS    = ['sun', '', '', '', '', '', 'sat'];
+
+const SHEET_ID = '1KNqCflKCCYlEmF2KMmcCXD_jRraytRlMoHI5glprKPE';
 
 const SHIFT_OPTIONS = [
   { key: 'h11-22',  label: '11:00-22:00', sub: '土日祝のみ' },
@@ -1174,68 +1166,72 @@ function renderComparison() {
 // ========================================
 // ダッシュボード — スプレッドシート連携
 // ========================================
-function saveSheetUrl() {
-  const url = document.getElementById('sheetCsvUrl').value;
-  localStorage.setItem('sheetCsvUrl', url);
-}
-
 async function fetchDashboardData() {
-  const url = document.getElementById('sheetCsvUrl').value.trim();
-  const dot = document.getElementById('syncDot');
+  const dot  = document.getElementById('syncDot');
   const text = document.getElementById('syncText');
-
-  if (!url) {
-    text.textContent = '⚠ スプレッドシートURLを設定してください';
-    dot.className = 'sync-dot error';
-    return;
-  }
-
   text.textContent = '取得中...';
+  dot.className = 'sync-dot ok';
+
+  // サマリーシートをCSVで取得
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=%E3%82%B5%E3%83%9E%E3%83%AA%E3%83%BC`;
 
   try {
-    // CORS対策: Google Sheetsの公開CSVはno-corsで取得
-    const response = await fetch(url, { mode: 'cors', cache: 'no-cache' });
+    const response = await fetch(url, { cache: 'no-cache' });
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const csvText = await response.text();
-    parseDashboardCsv(csvText);
+    parseSummaryCsv(csvText);
     const now = new Date();
     text.textContent = '✅ 最終更新: ' + now.toLocaleTimeString('ja-JP');
     dot.className = 'sync-dot ok';
   } catch (err) {
-    text.textContent = '❌ 取得失敗: ' + err.message;
+    text.textContent = '❌ 取得失敗（スプレッドシートを公開設定にしてください）';
     dot.className = 'sync-dot error';
+    console.error('Dashboard fetch error:', err);
   }
 
   updateNextUpdateTime();
 }
 
-function parseDashboardCsv(csvText) {
+function parseSummaryCsv(csvText) {
+  // フォーマット: 更新日時, 店舗, 本日予約数
   const lines = csvText.split('\n').map(l => l.trim()).filter(l => l);
-  // dashboardシートのフォーマット想定:
-  // 行1: ヘッダー (キー, 値)
-  // 行2: reservations, 数値
-  // 行3: staff_count, 数値
-  // 行4: staff_names, 名前1/名前2/...
-  const data = {};
-  lines.forEach(line => {
-    const cols = parseCsvLine(line);
-    if (cols.length >= 2) {
-      data[cols[0].trim()] = cols[1].trim();
-    }
-  });
+  const storeMap = {};
+  let lastUpdated = '';
+  let total = 0;
 
-  if (data['reservations'] !== undefined) {
-    document.getElementById('dashReservations').textContent = data['reservations'];
-  }
-  if (data['staff_count'] !== undefined) {
-    document.getElementById('dashStaffCount').textContent = data['staff_count'];
-  }
-  if (data['staff_names'] !== undefined) {
-    const names = data['staff_names'].split('/').map(n => n.trim()).filter(n => n);
-    const container = document.getElementById('dashStaffList');
-    if (names.length > 0) {
-      container.innerHTML = names.map(n => `<span class="staff-chip">${n}</span>`).join('');
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    if (cols.length < 3) continue;
+    const [updatedAt, store, countStr] = cols;
+    const count = parseInt(countStr) || 0;
+    if (!lastUpdated && updatedAt) lastUpdated = updatedAt;
+    if (store === '合計') {
+      total = count;
+    } else {
+      storeMap[store] = count;
     }
+  }
+
+  // 合計
+  document.getElementById('dashReservations').textContent = total || Object.values(storeMap).reduce((a,b)=>a+b,0);
+
+  // 店舗別カード
+  const storeIcons = { '本社':'🏛','西新宿本店':'🏠','新宿三丁目':'🏢','渋谷東':'🌿' };
+  const breakdown = document.getElementById('dashStoreBreakdown');
+  if (Object.keys(storeMap).length === 0) {
+    breakdown.innerHTML = '<div style="color:#aaa;font-size:13px;grid-column:1/-1">データなし（GASスクリプトを実行してください）</div>';
+  } else {
+    breakdown.innerHTML = Object.entries(storeMap).map(([store, count]) => `
+      <div style="background:#f8f9fa;border-radius:10px;padding:14px;text-align:center;border:1.5px solid #e0e0e0">
+        <div style="font-size:20px;margin-bottom:4px">${storeIcons[store] || '🏪'}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:6px">${store}</div>
+        <div style="font-size:28px;font-weight:800;color:#0f3460">${count}</div>
+        <div style="font-size:11px;color:#888">件</div>
+      </div>`).join('');
+  }
+
+  if (lastUpdated) {
+    document.getElementById('dashLastUpdated').textContent = '　GAS更新: ' + lastUpdated;
   }
 }
 
