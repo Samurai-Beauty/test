@@ -337,6 +337,25 @@
     .btn-cancel:hover { background: #f8f9fa; }
     .nav-divider { border-top: 1px solid rgba(0,0,0,0.1); margin: 8px 0; }
 
+    /* ===== お知らせ ===== */
+    .notice-tab {
+      padding: 8px 18px; border-radius: 8px; border: 1.5px solid #ddd;
+      cursor: pointer; font-size: 13px; font-weight: 600; background: white; color: #555;
+      transition: all .15s;
+    }
+    .notice-tab.active { background: #333; color: white; border-color: #333; }
+    .notice-card {
+      background: white; border-radius: 12px; padding: 16px 20px;
+      margin-bottom: 12px; border: 1.5px solid #e0e0e0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .notice-card.pinned { border-color: #f0a500; border-left: 4px solid #f0a500; }
+    .notice-card .notice-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .notice-card .notice-title { font-size: 15px; font-weight: 700; color: #1a1a1a; }
+    .notice-card .notice-meta { font-size: 11px; color: #aaa; margin-bottom: 8px; }
+    .notice-card .notice-body { font-size: 13px; color: #444; line-height: 1.7; white-space: pre-wrap; }
+    .pin-badge { font-size: 11px; background: #f0a500; color: white; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
+
     /* ===== モバイル対応 ===== */
     @media (max-width: 768px) {
       nav.sidebar { width: 56px; }
@@ -405,6 +424,10 @@
       </div>
       <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
         <span class="icon">👥</span><span>スタイリスト管理</span>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-item" onclick="showSection('notice')" id="nav-notice">
+        <span class="icon">📢</span><span>お知らせ</span>
       </div>
       <div class="nav-divider"></div>
       <div class="nav-item" onclick="showSection('profile')" id="nav-profile">
@@ -697,6 +720,52 @@
         </div>
       </div>
 
+      <!-- ====== お知らせ ====== -->
+      <div class="section" id="section-notice">
+        <div class="section-title">お知らせ</div>
+
+        <!-- 本社のみ：投稿タブ切り替え -->
+        <div id="noticeTabBar" style="display:none;margin-bottom:16px">
+          <div style="display:flex;gap:8px">
+            <button id="noticeTabView" class="notice-tab active" onclick="switchNoticeTab('view')">📋 一覧</button>
+            <button id="noticeTabEdit" class="notice-tab" onclick="switchNoticeTab('edit')">✏️ 編集・投稿</button>
+          </div>
+        </div>
+
+        <!-- 一覧 -->
+        <div id="noticePanelView">
+          <div id="noticeList"><div style="color:#aaa;text-align:center;padding:40px">お知らせはまだありません</div></div>
+        </div>
+
+        <!-- 編集（本社のみ） -->
+        <div id="noticePanelEdit" style="display:none">
+          <div class="card">
+            <div class="card-title">➕ お知らせを投稿</div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">タイトル</label>
+                <input type="text" id="noticeTitle" placeholder="例：4月のシフト締切について" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px">
+              </div>
+              <div>
+                <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">内容</label>
+                <textarea id="noticeContent" rows="4" placeholder="お知らせの内容を入力..." style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" id="noticePinned" style="width:16px;height:16px">
+                <label for="noticePinned" style="font-size:13px;color:#555">📌 ピン留めする（上部に固定表示）</label>
+              </div>
+              <button class="btn-primary" onclick="postNotice()">投稿する</button>
+              <div id="noticePostMsg" style="font-size:13px;display:none"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">📋 投稿済み一覧（削除）</div>
+            <div id="noticeEditList"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- ====== スタイリスト管理（本社のみ）====== -->
       <div class="section" id="section-stylist-manage">
         <div class="section-title">スタイリスト管理</div>
@@ -966,6 +1035,105 @@ async function removeStylist(name) {
   renderStylistManage();
 }
 
+// ========================================
+// お知らせ
+// ========================================
+let notices = []; // { id, title, content, date, author, pinned }
+
+async function loadNotices() {
+  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__notices').maybeSingle();
+  notices = (data && Array.isArray(data.data_json)) ? data.data_json : [];
+}
+
+async function saveNotices() {
+  await sb.from('sales_data').upsert({
+    store_key: '__notices',
+    filename: 'notices.json',
+    data_json: notices,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || ''
+  }, { onConflict: 'store_key' });
+}
+
+function switchNoticeTab(tab) {
+  document.getElementById('noticePanelView').style.display = tab === 'view' ? 'block' : 'none';
+  document.getElementById('noticePanelEdit').style.display = tab === 'edit' ? 'block' : 'none';
+  document.getElementById('noticeTabView').classList.toggle('active', tab === 'view');
+  document.getElementById('noticeTabEdit').classList.toggle('active', tab === 'edit');
+  if (tab === 'edit') renderNoticeEditList();
+}
+
+function renderNoticeList() {
+  const container = document.getElementById('noticeList');
+  if (notices.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;text-align:center;padding:40px">お知らせはまだありません</div>';
+    return;
+  }
+  const sorted = [...notices].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return new Date(b.date) - new Date(a.date);
+  });
+  container.innerHTML = sorted.map(n => `
+    <div class="notice-card ${n.pinned ? 'pinned' : ''}">
+      <div class="notice-header">
+        ${n.pinned ? '<span class="pin-badge">📌 ピン留め</span>' : ''}
+        <span class="notice-title">${escHtml(n.title)}</span>
+      </div>
+      <div class="notice-meta">${n.date} ／ ${escHtml(n.author)}</div>
+      <div class="notice-body">${escHtml(n.content)}</div>
+    </div>`).join('');
+}
+
+function renderNoticeEditList() {
+  const container = document.getElementById('noticeEditList');
+  if (notices.length === 0) { container.innerHTML = '<div style="color:#aaa;font-size:13px">投稿はまだありません</div>'; return; }
+  const sorted = [...notices].sort((a, b) => new Date(b.date) - new Date(a.date));
+  container.innerHTML = sorted.map(n => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:8px;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.pinned ? '📌 ' : ''}${escHtml(n.title)}</div>
+        <div style="font-size:11px;color:#aaa">${n.date}</div>
+      </div>
+      <button onclick="deleteNotice('${n.id}')" style="padding:4px 12px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px;white-space:nowrap">削除</button>
+    </div>`).join('');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function postNotice() {
+  const title   = document.getElementById('noticeTitle').value.trim();
+  const content = document.getElementById('noticeContent').value.trim();
+  const pinned  = document.getElementById('noticePinned').checked;
+  const msg     = document.getElementById('noticePostMsg');
+  msg.style.display = 'block';
+  if (!title || !content) { msg.style.color = '#e74c3c'; msg.textContent = 'タイトルと内容を入力してください'; return; }
+  const notice = {
+    id: Date.now().toString(),
+    title, content, pinned,
+    date: new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g,'-'),
+    author: currentUser || ''
+  };
+  notices.unshift(notice);
+  await saveNotices();
+  document.getElementById('noticeTitle').value = '';
+  document.getElementById('noticeContent').value = '';
+  document.getElementById('noticePinned').checked = false;
+  msg.style.color = '#27ae60'; msg.textContent = '投稿しました';
+  setTimeout(() => { msg.style.display = 'none'; }, 2000);
+  renderNoticeEditList();
+  renderNoticeList();
+}
+
+async function deleteNotice(id) {
+  if (!confirm('このお知らせを削除しますか？')) return;
+  notices = notices.filter(n => n.id !== id);
+  await saveNotices();
+  renderNoticeEditList();
+  renderNoticeList();
+}
+
 function renderStylistManage() {
   const list = document.getElementById('stylistList');
   if (!list) return;
@@ -1032,6 +1200,9 @@ function doLogin() {
   document.getElementById('nav-stylist-manage').style.display = isHonsha ? 'flex' : 'none';
   // カスタムスタイリストをSupabaseから読込
   loadCustomStylists();
+  // お知らせ読み込み・本社は編集タブ表示
+  loadNotices().then(() => renderNoticeList());
+  document.getElementById('noticeTabBar').style.display = isHonsha ? 'block' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
   // Supabase から売上データを復元
@@ -1060,6 +1231,7 @@ function showSection(name) {
   else if (name === 'shift-manage') renderShiftManage();
   else if (name === 'shift-view') renderShiftView();
   else if (name === 'stylist-manage') renderStylistManage();
+  else if (name === 'notice') { renderNoticeList(); }
 }
 
 // ========================================
