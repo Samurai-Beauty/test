@@ -1247,6 +1247,7 @@ function doLogin() {
   const isHonsha = store === 'honsha';
   document.getElementById('nav-sales').style.display = isHonsha ? 'flex' : 'none';
   document.getElementById('nav-stylist-manage').style.display = isHonsha ? 'flex' : 'none';
+  document.getElementById('nav-shift-request').style.display = isHonsha ? 'none' : 'flex';
   // カスタムスタイリストをSupabaseから読込
   loadCustomStylists();
   // お知らせ読み込み・本社は編集タブ表示
