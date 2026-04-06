@@ -880,9 +880,6 @@ function doLogin() {
   document.getElementById('headerUserName').textContent = STORE_LABELS[store] + ' | ' + name;
   document.getElementById('profileName').value = name;
   document.getElementById('profileRole').value = name === 'オーナー' ? 'オーナー' : 'スタイリスト';
-  // スプレッドシートURL 復元
-  const savedUrl = localStorage.getItem('sheetCsvUrl') || '';
-  document.getElementById('sheetCsvUrl').value = savedUrl;
   // シフト月初期化
   const _t = new Date();
   shiftReqMonth    = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
