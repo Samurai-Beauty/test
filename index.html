@@ -2061,6 +2061,19 @@ function renderManageReqTable(y, m) {
   document.getElementById('manageReqTable').innerHTML = html;
 }
 
+// シフト時間の並び順
+const SHIFT_SORT_ORDER = { 'h11-17': 0, 'h11-22': 1, 'early': 2, 'full': 3, 'late': 4, 'omakase': 5 };
+
+function sortStaffByTime(names, day, dayTimes, allReqs) {
+  return [...names].sort((a, b) => {
+    const ka = dayTimes[a] || (allReqs[a] || {})[String(day)] || '';
+    const kb = dayTimes[b] || (allReqs[b] || {})[String(day)] || '';
+    const oa = SHIFT_SORT_ORDER[ka] ?? 99;
+    const ob = SHIFT_SORT_ORDER[kb] ?? 99;
+    return oa - ob;
+  });
+}
+
 function makeStaffChip(day, name, dayTimes, allReqs, extraStyle) {
   const reqKey = dayTimes[name] || (allReqs[name] || {})[String(day)];
   const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
@@ -2109,12 +2122,12 @@ function renderManageSchedCal(y, m) {
         const sc = STORE_COLORS[store] || '#555';
         if (si > 0) html += `<div style="width:100%;margin:4px 0 2px;border-top:1px dashed #ddd"></div>`;
         html += `<div style="width:100%;font-size:9px;font-weight:800;color:${sc};margin-bottom:2px;letter-spacing:.3px">${STORE_LABELS[store]}</div>`;
-        storeStaff.forEach(name => {
+        sortStaffByTime(storeStaff, day, dayTimes, allReqs).forEach(name => {
           html += makeStaffChip(day, name, dayTimes, allReqs, `border-left:3px solid ${sc}`);
         });
       });
     } else {
-      staffList.forEach(name => {
+      sortStaffByTime(staffList, day, dayTimes, allReqs).forEach(name => {
         html += makeStaffChip(day, name, dayTimes, allReqs, '');
       });
     }
