@@ -1811,6 +1811,21 @@ function getSchedTimes(y, m) {
 function saveSchedTimes(y, m, data) {
   localStorage.setItem(shiftKey('ssched_times', y, m), JSON.stringify(data));
 }
+function getSchedStores(y, m) {
+  const raw = localStorage.getItem(shiftKey('ssched_stores', y, m));
+  return raw ? JSON.parse(raw) : {};
+}
+function saveSchedStores(y, m, data) {
+  localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(data));
+}
+// スタッフのホーム店舗を返す
+function getHomeStore(name) {
+  for (const [store, members] of Object.entries(STORE_MEMBERS)) {
+    if (members.includes(name)) return store;
+  }
+  const custom = customStylists.find(s => s.name === name);
+  return custom ? custom.store : null;
+}
 function isPublished(y, m) {
   return localStorage.getItem(shiftKey('spub', y, m)) === '1';
 }
@@ -2053,8 +2068,9 @@ function renderManageSchedCal(y, m) {
   badge.textContent = pub ? '公開済み' : '未公開';
   badge.className = 'submit-badge ' + (pub ? 'done' : 'pending');
 
-  const allReqs = getAllReqs(y, m);
-  const schedTimes = getSchedTimes(y, m);
+  const allReqs     = getAllReqs(y, m);
+  const schedTimes  = getSchedTimes(y, m);
+  const schedStores = getSchedStores(y, m);
 
   const multiStore = shiftManageStore.length > 1;
 
@@ -2072,10 +2088,13 @@ function renderManageSchedCal(y, m) {
     html += '<div class="staff-tags">';
 
     if (multiStore) {
-      // 店舗ごとにグループ表示
+      const dayStoreMap = schedStores[String(day)] || {};
+      // 店舗ごとにグループ表示（出勤店舗設定を優先、なければホーム店舗）
       shiftManageStore.forEach((store, si) => {
-        const storeMembers = getMembersOfStore(store);
-        const storeStaff = staffList.filter(n => storeMembers.includes(n));
+        const storeStaff = staffList.filter(n => {
+          const assigned = dayStoreMap[n] || getHomeStore(n);
+          return assigned === store;
+        });
         if (storeStaff.length === 0) return;
         const sc = STORE_COLORS[store] || '#555';
         if (si > 0) html += `<div style="width:100%;margin:4px 0 2px;border-top:1px dashed #ddd"></div>`;
@@ -2180,11 +2199,17 @@ function removeSchedStaff(day, name) {
   sched[String(day)] = (sched[String(day)] || []).filter(n => n !== name);
   if (!sched[String(day)].length) delete sched[String(day)];
   saveSched(y, m, sched);
-  const schedTimes = getSchedTimes(y, m);
+  const schedTimes  = getSchedTimes(y, m);
   if (schedTimes[String(day)]) {
     delete schedTimes[String(day)][name];
     if (!Object.keys(schedTimes[String(day)]).length) delete schedTimes[String(day)];
     saveSchedTimes(y, m, schedTimes);
+  }
+  const schedStores = getSchedStores(y, m);
+  if (schedStores[String(day)]) {
+    delete schedStores[String(day)][name];
+    if (!Object.keys(schedStores[String(day)]).length) delete schedStores[String(day)];
+    saveSchedStores(y, m, schedStores);
   }
   renderManageSchedCal(y, m);
 }
@@ -2194,60 +2219,83 @@ function openModal(day) {
   const { y, m } = shiftManageMonth;
   const sched = getSched(y, m);
   const assigned = sched[String(day)] || [];
-  const allReqs  = getAllReqs(y, m);
+  const allReqs    = getAllReqs(y, m);
   const schedTimes = getSchedTimes(y, m);
-  const dayTimes = schedTimes[String(day)] || {};
+  const schedStores = getSchedStores(y, m);
+  const dayTimes  = schedTimes[String(day)] || {};
+  const dayStores = schedStores[String(day)] || {};
   const storeLabel = '（' + shiftManageStore.map(k => STORE_LABELS[k]).join('・') + '）';
   document.getElementById('modalDayLabel').textContent = day + '日 担当スタッフを選択' + storeLabel;
   const members = getMembersForManage();
   let html = '';
   const timeOpts = SHIFT_OPTIONS.filter(o => o.key !== 'off');
+  const storeOpts = ['nishishinjuku','sanchome','shibuya'];
   members.forEach(name => {
     const sel = assigned.includes(name);
     const reqKey = (allReqs[name] || {})[String(day)] || '';
-    const currentTime = dayTimes[name] || reqKey || '';
+    const currentTime  = dayTimes[name]  || reqKey || '';
+    const homeStore    = getHomeStore(name);
+    const currentStore = dayStores[name] || homeStore || '';
     const hint = reqKey === 'off' ? ' 🔴' : reqKey ? ' 🟢' : '';
-    let optHtml = '<option value="">時間未設定</option>';
+    let timeOptHtml = '<option value="">時間未設定</option>';
     timeOpts.forEach(o => {
-      optHtml += `<option value="${o.key}" ${currentTime === o.key ? 'selected' : ''}>${o.label}${o.sub ? '（' + o.sub + '）' : ''}</option>`;
+      timeOptHtml += `<option value="${o.key}" ${currentTime === o.key ? 'selected' : ''}>${o.label}${o.sub ? '（' + o.sub + '）' : ''}</option>`;
     });
-    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">`;
-    html += `<button class="modal-staff-btn ${sel ? 'selected' : ''}" data-name="${name}" style="flex:1;text-align:left" onclick="toggleModalStaff(this)">${name}${hint}</button>`;
-    html += `<select class="modal-shift-sel" data-name="${name}" style="display:${sel ? 'block' : 'none'};font-size:12px;padding:5px 4px;border:1.5px solid #ddd;border-radius:6px;min-width:120px">${optHtml}</select>`;
-    html += '</div>';
+    let storeOptHtml = '';
+    storeOpts.forEach(s => {
+      storeOptHtml += `<option value="${s}" ${currentStore === s ? 'selected' : ''}>${STORE_LABELS[s]}</option>`;
+    });
+    const disp = sel ? 'flex' : 'none';
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">`;
+    html += `<button class="modal-staff-btn ${sel ? 'selected' : ''}" data-name="${name}" style="flex:1;min-width:90px;text-align:left" onclick="toggleModalStaff(this)">${name}${hint}</button>`;
+    html += `<div class="modal-staff-extras" data-name="${name}" style="display:${disp};gap:6px;align-items:center">`;
+    html += `<select class="modal-shift-sel" data-name="${name}" style="font-size:11px;padding:4px 3px;border:1.5px solid #ddd;border-radius:6px;min-width:110px">${timeOptHtml}</select>`;
+    html += `<select class="modal-store-sel" data-name="${name}" style="font-size:11px;padding:4px 3px;border:1.5px solid ${STORE_COLORS[currentStore]||'#ddd'};border-radius:6px;min-width:90px;color:${STORE_COLORS[currentStore]||'#333'};font-weight:700" onchange="updateStoreSelColor(this)">${storeOptHtml}</select>`;
+    html += '</div></div>';
   });
   document.getElementById('modalStaffList').innerHTML = html;
   document.getElementById('staffModal').style.display = 'flex';
+}
+
+function updateStoreSelColor(sel) {
+  const c = STORE_COLORS[sel.value] || '#ddd';
+  sel.style.borderColor = c;
+  sel.style.color = c;
 }
 
 function toggleModalStaff(btn) {
   btn.classList.toggle('selected');
   const name = btn.dataset.name;
   const sel = btn.classList.contains('selected');
-  const selEl = document.querySelector(`#modalStaffList [data-name="${CSS.escape(name)}"].modal-shift-sel`);
-  if (selEl) selEl.style.display = sel ? 'block' : 'none';
+  const extras = document.querySelector(`#modalStaffList .modal-staff-extras[data-name="${CSS.escape(name)}"]`);
+  if (extras) extras.style.display = sel ? 'flex' : 'none';
 }
 
 function confirmStaffModal() {
   const { y, m } = shiftManageMonth;
   const sched = getSched(y, m);
-  const schedTimes = getSchedTimes(y, m);
+  const schedTimes  = getSchedTimes(y, m);
+  const schedStores = getSchedStores(y, m);
   const selected = Array.from(
     document.querySelectorAll('#modalStaffList .modal-staff-btn.selected')
   ).map(btn => btn.dataset.name);
-  // シフト時間を保存
-  const newDayTimes = {};
+  // シフト時間・出勤店舗を保存
+  const newDayTimes = {}, newDayStores = {};
   document.querySelectorAll('#modalStaffList .modal-shift-sel').forEach(sel => {
-    if (selected.includes(sel.dataset.name) && sel.value) {
-      newDayTimes[sel.dataset.name] = sel.value;
-    }
+    if (selected.includes(sel.dataset.name) && sel.value) newDayTimes[sel.dataset.name] = sel.value;
+  });
+  document.querySelectorAll('#modalStaffList .modal-store-sel').forEach(sel => {
+    if (selected.includes(sel.dataset.name) && sel.value) newDayStores[sel.dataset.name] = sel.value;
   });
   if (selected.length > 0) sched[String(modalDay)] = selected;
   else delete sched[String(modalDay)];
   if (Object.keys(newDayTimes).length > 0) schedTimes[String(modalDay)] = newDayTimes;
   else delete schedTimes[String(modalDay)];
+  if (Object.keys(newDayStores).length > 0) schedStores[String(modalDay)] = newDayStores;
+  else delete schedStores[String(modalDay)];
   saveSched(y, m, sched);
   saveSchedTimes(y, m, schedTimes);
+  saveSchedStores(y, m, schedStores);
   document.getElementById('staffModal').style.display = 'none';
   renderManageSchedCal(y, m);
 }
