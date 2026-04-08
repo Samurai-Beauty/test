@@ -433,7 +433,7 @@
       <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
         <span class="icon">👥</span><span>スタイリスト管理</span>
       </div>
-      <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions" style="display:none">
+      <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
         <span class="icon">💬</span><span>ご意見箱</span>
       </div>
       <div class="nav-divider"></div>
@@ -1409,8 +1409,8 @@ function doLogin() {
   document.getElementById('nav-stylist-manage').style.display = isMgr ? 'flex' : 'none';
   // 売上管理は本社のみ
   document.getElementById('nav-sales').style.display = isHonsha ? 'flex' : 'none';
-  // ご意見箱は本社のみ
-  document.getElementById('nav-suggestions').style.display = isHonsha ? 'flex' : 'none';
+  // ご意見箱は全員に表示（スタイリスト→投稿、本社→閲覧・返信）
+  document.getElementById('nav-suggestions').style.display = 'flex';
   // シフト希望は管理者には非表示
   document.getElementById('nav-shift-request').style.display = isMgr ? 'none' : 'flex';
   // 店舗管理者はデフォルトで自店舗のみ表示
@@ -1891,12 +1891,12 @@ async function saveSuggestions() {
 }
 
 function renderSuggestions() {
-  const isMgr = currentStore === 'honsha' || isManagerRole(currentUser, currentStore);
-  document.getElementById('suggestionFormArea').style.display = isMgr ? 'none' : 'block';
-  document.getElementById('mySuggestionsArea').style.display = isMgr ? 'none' : 'block';
-  document.getElementById('allSuggestionsArea').style.display = isMgr ? 'block' : 'none';
+  const isHonshaView = currentStore === 'honsha';
+  document.getElementById('suggestionFormArea').style.display = isHonshaView ? 'none' : 'block';
+  document.getElementById('mySuggestionsArea').style.display = isHonshaView ? 'none' : 'block';
+  document.getElementById('allSuggestionsArea').style.display = isHonshaView ? 'block' : 'none';
 
-  if (isMgr) {
+  if (isHonshaView) {
     renderAllSuggestions();
   } else {
     renderMySuggestions();
