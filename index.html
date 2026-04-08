@@ -444,6 +444,12 @@
       <div class="section active" id="section-dashboard">
         <div class="section-title">ホーム</div>
 
+        <!-- 今日の出勤者 -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" id="todayWidgetTitle">👥 今日の出勤者</div>
+          <div id="todayStaffList" style="margin-top:8px"></div>
+        </div>
+
         <!-- お知らせ -->
         <div class="card">
           <div class="card-title">📢 お知らせ</div>
@@ -1094,6 +1100,96 @@ function switchNoticeTab(tab) {
   if (tab === 'edit') renderNoticeEditList();
 }
 
+function renderTodayStaff() {
+  const container = document.getElementById('todayStaffList');
+  const titleEl   = document.getElementById('todayWidgetTitle');
+  if (!container || !currentUser) return;
+
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate();
+  const dow = now.getDay();
+  const WDAY = ['日','月','火','水','木','金','土'];
+  titleEl.textContent = `👥 今日の出勤者（${m}/${d}・${WDAY[dow]}）`;
+
+  if (!isPublished(y, m)) {
+    container.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:16px">今月のシフトはまだ公開されていません</div>';
+    return;
+  }
+
+  const sched      = getSched(y, m);
+  const allReqs    = getAllReqs(y, m);
+  const schedTimes = getSchedTimes(y, m);
+  const schedStores = getSchedStores(y, m);
+  const dayStaff   = sched[String(d)] || [];
+
+  if (dayStaff.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:16px">本日の出勤者はいません</div>';
+    return;
+  }
+
+  const isHonsha = currentStore === 'honsha';
+  // 表示するスタッフ（本社は全員、店舗は自店舗のみ）
+  const storeFilter = isHonsha ? null : (() => {
+    const base = STORE_MEMBERS[currentStore] || [];
+    const custom = customStylists.filter(s => s.store === currentStore).map(s => s.name);
+    return [...base, ...custom];
+  })();
+  const filtered = storeFilter ? dayStaff.filter(n => storeFilter.includes(n)) : dayStaff;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:16px">本日の出勤者はいません</div>';
+    return;
+  }
+
+  const dayTimes  = schedTimes[String(d)] || {};
+  const dayStores = schedStores[String(d)] || {};
+
+  // 時間順にソート
+  const sorted = sortStaffByTime(filtered, d, dayTimes, allReqs);
+
+  // 本社は店舗グループ表示、店舗は一覧表示
+  if (isHonsha) {
+    const storeKeys = ['nishishinjuku', 'sanchome', 'shibuya'];
+    let html = '';
+    storeKeys.forEach(store => {
+      const storeMembers = getMembersOfStore(store);
+      const staffForStore = sorted.filter(n => {
+        const assignedStore = dayStores[n] || getHomeStore(n);
+        return assignedStore === store;
+      });
+      if (staffForStore.length === 0) return;
+      const sc = STORE_COLORS[store] || '#555';
+      html += `<div style="font-size:11px;font-weight:800;color:${sc};margin:8px 0 4px">${STORE_LABELS[store]}</div>`;
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      staffForStore.forEach(name => {
+        const reqKey = dayTimes[name] || (allReqs[name] || {})[String(d)] || '';
+        const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
+        const c = reqKey ? getShiftColor(reqKey) : { bg: '#95a5a6', text: '#fff' };
+        const timeText = opt ? opt.label : '時間未設定';
+        html += `<div style="background:${c.bg};color:${c.text};border-radius:8px;padding:6px 12px;font-size:13px;border-left:3px solid ${sc}">`;
+        html += `<div style="font-weight:700">${name}</div>`;
+        html += `<div style="font-size:11px;opacity:0.9">${timeText}</div></div>`;
+      });
+      html += '</div>';
+    });
+    container.innerHTML = html || '<div style="color:#aaa;font-size:13px;text-align:center;padding:16px">本日の出勤者はいません</div>';
+  } else {
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    sorted.forEach(name => {
+      const reqKey = dayTimes[name] || (allReqs[name] || {})[String(d)] || '';
+      const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
+      const c = reqKey ? getShiftColor(reqKey) : { bg: '#95a5a6', text: '#fff' };
+      const timeText = opt ? opt.label : '時間未設定';
+      const isMe = name === currentUser;
+      html += `<div style="background:${isMe ? '#e2b96f' : c.bg};color:${isMe ? '#1a1a2e' : c.text};border-radius:8px;padding:8px 14px;font-size:13px;${isMe ? 'font-weight:800;border:2px solid #c9972e' : ''}">`;
+      html += `<div style="font-weight:700">${name}${isMe ? ' ★' : ''}</div>`;
+      html += `<div style="font-size:11px;opacity:0.9">${timeText}</div></div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+}
+
 function renderHomeNotice() {
   const container = document.getElementById('homeNoticeList');
   if (!container) return;
@@ -1258,7 +1354,7 @@ function doLogin() {
   // カスタムスタイリストをSupabaseから読込
   loadCustomStylists();
   // お知らせ読み込み・本社は編集タブ表示
-  loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); });
+  loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); renderTodayStaff(); });
   document.getElementById('noticeTabBar').style.display = isHonsha ? 'block' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
