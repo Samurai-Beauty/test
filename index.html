@@ -433,7 +433,7 @@
       <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
         <span class="icon">👥</span><span>スタイリスト管理</span>
       </div>
-      <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
+      <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions" style="display:none">
         <span class="icon">💬</span><span>ご意見箱</span>
       </div>
       <div class="nav-divider"></div>
@@ -1408,6 +1408,8 @@ function doLogin() {
   document.getElementById('nav-stylist-manage').style.display = isMgr ? 'flex' : 'none';
   // 売上管理は本社のみ
   document.getElementById('nav-sales').style.display = isHonsha ? 'flex' : 'none';
+  // ご意見箱は本社のみ
+  document.getElementById('nav-suggestions').style.display = isHonsha ? 'flex' : 'none';
   // シフト希望は管理者には非表示
   document.getElementById('nav-shift-request').style.display = isMgr ? 'none' : 'flex';
   // 店舗管理者はデフォルトで自店舗のみ表示
