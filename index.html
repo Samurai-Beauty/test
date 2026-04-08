@@ -433,6 +433,9 @@
       <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
         <span class="icon">👥</span><span>スタイリスト管理</span>
       </div>
+      <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
+        <span class="icon">💬</span><span>ご意見箱</span>
+      </div>
       <div class="nav-divider"></div>
       <div class="nav-item" onclick="showSection('profile')" id="nav-profile">
         <span class="icon">👤</span><span>プロフィール</span>
@@ -825,6 +828,49 @@
       </div>
 
       <!-- ====== プロフィール ====== -->
+      <!-- ====== ご意見箱 ====== -->
+      <div class="section" id="section-suggestions">
+        <div class="section-title">💬 ご意見箱・リクエスト</div>
+        <!-- スタイリスト：投稿フォーム -->
+        <div id="suggestionFormArea">
+          <div class="card">
+            <div class="card-title">新しい意見・リクエストを送る</div>
+            <div class="form-group">
+              <label>カテゴリ</label>
+              <select id="suggCat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+                <option value="request">リクエスト</option>
+                <option value="opinion">ご意見・改善提案</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>内容</label>
+              <textarea id="suggContent" rows="4" placeholder="内容を入力してください..." style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;resize:vertical;box-sizing:border-box"></textarea>
+            </div>
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="suggAnon" style="width:16px;height:16px"> 匿名で送る
+              </label>
+            </div>
+            <button class="btn-primary" onclick="submitSuggestion()" style="width:100%">送信する</button>
+          </div>
+        </div>
+        <!-- 自分の投稿一覧（スタイリスト）-->
+        <div id="mySuggestionsArea">
+          <div class="card">
+            <div class="card-title">自分の投稿</div>
+            <div id="mySuggestionsList"></div>
+          </div>
+        </div>
+        <!-- 管理者：全投稿一覧 -->
+        <div id="allSuggestionsArea" style="display:none">
+          <div class="card">
+            <div class="card-title">すべての投稿</div>
+            <div id="allSuggestionsList"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="section" id="section-profile">
         <div class="section-title">プロフィール</div>
         <div class="profile-grid">
@@ -1000,6 +1046,14 @@ const STORE_LABELS = {
   sanchome: '新宿三丁目',
   shibuya: '渋谷東',
 };
+// 店舗マネージャー定義（渋谷東限定管理者など）
+const STORE_MANAGERS = {
+  shibuya: ['岡田颯太'],
+};
+function isManagerRole(name, store) {
+  return (STORE_MANAGERS[store] || []).includes(name);
+}
+
 const STORE_COLORS = {
   nishishinjuku: '#1a7a4a',
   sanchome:      '#6c3483',
@@ -1347,19 +1401,28 @@ function doLogin() {
   shiftReqMonth    = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
-  // 本社のみシフト管理を表示
-  document.getElementById('nav-shift-manage').style.display =
-    store === 'honsha' ? 'flex' : 'none';
-  // 本社のみ売上管理・スタイリスト管理を表示
   const isHonsha = store === 'honsha';
+  const isMgr = isHonsha || isManagerRole(name, store);
+  // シフト管理・スタイリスト管理は本社＋店舗管理者に表示
+  document.getElementById('nav-shift-manage').style.display = isMgr ? 'flex' : 'none';
+  document.getElementById('nav-stylist-manage').style.display = isMgr ? 'flex' : 'none';
+  // 売上管理は本社のみ
   document.getElementById('nav-sales').style.display = isHonsha ? 'flex' : 'none';
-  document.getElementById('nav-stylist-manage').style.display = isHonsha ? 'flex' : 'none';
-  document.getElementById('nav-shift-request').style.display = isHonsha ? 'none' : 'flex';
+  // シフト希望は管理者には非表示
+  document.getElementById('nav-shift-request').style.display = isMgr ? 'none' : 'flex';
+  // 店舗管理者はデフォルトで自店舗のみ表示
+  if (isMgr && !isHonsha) {
+    shiftManageStore = [store];
+  } else if (isHonsha) {
+    shiftManageStore = ['nishishinjuku'];
+  }
+  // 店舗タブの表示状態を更新
+  updateManageStoreTabs();
   // カスタムスタイリストをSupabaseから読込
   loadCustomStylists();
-  // お知らせ読み込み・本社は編集タブ表示
+  // お知らせ読み込み・管理者は編集タブ表示
   loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); renderTodayStaff(); });
-  document.getElementById('noticeTabBar').style.display = isHonsha ? 'block' : 'none';
+  document.getElementById('noticeTabBar').style.display = isMgr ? 'block' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
   // Supabase から売上データを復元
@@ -1447,10 +1510,11 @@ function showSection(name) {
   document.getElementById('section-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
   if (name === 'shift-request') renderShiftRequest();
-  else if (name === 'shift-manage') renderShiftManage();
+  else if (name === 'shift-manage') { updateManageStoreTabs(); renderShiftManage(); }
   else if (name === 'shift-view') renderShiftView();
   else if (name === 'stylist-manage') renderStylistManage();
   else if (name === 'notice') { renderNoticeList(); }
+  else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
 }
 
 // ========================================
@@ -1801,6 +1865,139 @@ function scheduleDashboardUpdates() {
     updateNextUpdateTime();
   }, 60000);
   updateNextUpdateTime();
+}
+
+// ========================================
+// ご意見箱・リクエスト
+// ========================================
+let suggestions = []; // { id, author, anon, category, content, status, createdAt, replies:[{author,content,createdAt}] }
+
+async function loadSuggestions() {
+  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__suggestions').maybeSingle();
+  suggestions = (data && Array.isArray(data.data_json)) ? data.data_json : [];
+}
+
+async function saveSuggestions() {
+  await sb.from('sales_data').upsert({
+    store_key: '__suggestions',
+    filename: 'suggestions.json',
+    data_json: suggestions,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || ''
+  }, { onConflict: 'store_key' });
+}
+
+function renderSuggestions() {
+  const isMgr = currentStore === 'honsha' || isManagerRole(currentUser, currentStore);
+  document.getElementById('suggestionFormArea').style.display = isMgr ? 'none' : 'block';
+  document.getElementById('mySuggestionsArea').style.display = isMgr ? 'none' : 'block';
+  document.getElementById('allSuggestionsArea').style.display = isMgr ? 'block' : 'none';
+
+  if (isMgr) {
+    renderAllSuggestions();
+  } else {
+    renderMySuggestions();
+  }
+}
+
+function catLabel(cat) {
+  return cat === 'request' ? 'リクエスト' : cat === 'opinion' ? 'ご意見・改善提案' : 'その他';
+}
+
+function catColor(cat) {
+  return cat === 'request' ? '#2980b9' : cat === 'opinion' ? '#8e44ad' : '#7f8c8d';
+}
+
+function renderMySuggestions() {
+  const mine = suggestions.filter(s => s.author === currentUser);
+  const el = document.getElementById('mySuggestionsList');
+  if (mine.length === 0) {
+    el.innerHTML = '<p style="color:#aaa;text-align:center;padding:16px">まだ投稿はありません</p>';
+    return;
+  }
+  el.innerHTML = mine.slice().reverse().map(s => suggCardHtml(s, false)).join('');
+}
+
+function renderAllSuggestions() {
+  const el = document.getElementById('allSuggestionsList');
+  if (suggestions.length === 0) {
+    el.innerHTML = '<p style="color:#aaa;text-align:center;padding:16px">まだ投稿はありません</p>';
+    return;
+  }
+  el.innerHTML = suggestions.slice().reverse().map(s => suggCardHtml(s, true)).join('');
+}
+
+function suggCardHtml(s, isAdmin) {
+  const statusColor = s.status === 'replied' ? '#27ae60' : '#e67e22';
+  const statusLabel = s.status === 'replied' ? '返信済み' : '未返信';
+  const authorDisp = s.anon ? '匿名' : s.author;
+  const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString('ja-JP') : '';
+  let repliesHtml = '';
+  if (s.replies && s.replies.length > 0) {
+    repliesHtml = s.replies.map(r =>
+      `<div style="background:#eaf4fb;border-left:3px solid #2980b9;padding:8px 12px;border-radius:0 6px 6px 0;margin-top:8px;font-size:13px">
+        <span style="font-weight:700;color:#2980b9">${r.author}</span>
+        <span style="font-size:11px;color:#aaa;margin-left:8px">${new Date(r.createdAt).toLocaleDateString('ja-JP')}</span>
+        <p style="margin:4px 0 0">${r.content.replace(/\n/g,'<br>')}</p>
+      </div>`
+    ).join('');
+  }
+  const replyArea = isAdmin
+    ? `<div style="margin-top:10px">
+        <textarea id="replyBox_${s.id}" rows="2" placeholder="返信を入力..." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+        <button onclick="submitReply('${s.id}')" style="margin-top:6px;padding:6px 14px;background:#2980b9;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">返信する</button>
+      </div>` : '';
+  return `<div style="border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="background:${catColor(s.category)};color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700">${catLabel(s.category)}</span>
+      <span style="background:${statusColor};color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700">${statusLabel}</span>
+      <span style="font-size:12px;color:#555;font-weight:700">${authorDisp}</span>
+      <span style="font-size:11px;color:#aaa;margin-left:auto">${dateStr}</span>
+    </div>
+    <p style="margin:0;font-size:14px;line-height:1.6">${s.content.replace(/\n/g,'<br>')}</p>
+    ${repliesHtml}
+    ${replyArea}
+  </div>`;
+}
+
+async function submitSuggestion() {
+  const content = document.getElementById('suggContent').value.trim();
+  if (!content) { alert('内容を入力してください'); return; }
+  const anon = document.getElementById('suggAnon').checked;
+  const cat = document.getElementById('suggCat').value;
+  await loadSuggestions();
+  const newItem = {
+    id: Date.now().toString(),
+    author: currentUser,
+    anon,
+    category: cat,
+    content,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+    replies: []
+  };
+  suggestions.push(newItem);
+  await saveSuggestions();
+  document.getElementById('suggContent').value = '';
+  document.getElementById('suggAnon').checked = false;
+  alert('送信しました！');
+  renderSuggestions();
+}
+
+async function submitReply(suggId) {
+  const box = document.getElementById('replyBox_' + suggId);
+  if (!box) return;
+  const content = box.value.trim();
+  if (!content) { alert('返信内容を入力してください'); return; }
+  await loadSuggestions();
+  const s = suggestions.find(x => x.id === suggId);
+  if (!s) return;
+  s.replies = s.replies || [];
+  s.replies.push({ author: currentUser, content, createdAt: new Date().toISOString() });
+  s.status = 'replied';
+  await saveSuggestions();
+  alert('返信しました！');
+  renderSuggestions();
 }
 
 // ========================================
@@ -2280,6 +2477,10 @@ function applyRequestsToSchedule() {
 }
 
 function switchManageStore(storeKey) {
+  // 店舗管理者は自店舗のみ操作可
+  if (!currentStore || currentStore !== 'honsha') {
+    if (isManagerRole(currentUser, currentStore) && storeKey !== currentStore) return;
+  }
   const idx = shiftManageStore.indexOf(storeKey);
   if (idx >= 0) {
     if (shiftManageStore.length === 1) return; // 最低1店舗は選択維持
@@ -2292,6 +2493,22 @@ function switchManageStore(storeKey) {
     if (el) el.classList.toggle('active', shiftManageStore.includes(k));
   });
   renderShiftManage();
+}
+
+function updateManageStoreTabs() {
+  const allStores = ['nishishinjuku','sanchome','shibuya'];
+  const isMgrOnly = currentStore && currentStore !== 'honsha' && isManagerRole(currentUser, currentStore);
+  allStores.forEach(k => {
+    const el = document.getElementById('mstore-' + k);
+    if (!el) return;
+    if (isMgrOnly) {
+      // 店舗管理者は自店舗タブのみ表示
+      el.style.display = k === currentStore ? '' : 'none';
+    } else {
+      el.style.display = '';
+    }
+    el.classList.toggle('active', shiftManageStore.includes(k));
+  });
 }
 
 function getMembersOfStore(store) {
