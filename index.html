@@ -1906,28 +1906,38 @@ function scheduleDashboardUpdates() {
 // ========================================
 let suggestions = []; // { id, author, anon, category, content, status, createdAt, replies:[{author,content,createdAt}] }
 
-async function loadSuggestions() {
-  const { data, error } = await sb.from('sales_data').select('data_json').eq('store_key', '__suggestions').maybeSingle();
-  if (error) { console.error('loadSuggestions error:', error); suggestions = []; return; }
-  if (!data) { suggestions = []; return; }
-  // data_json が文字列で返る場合もパース
-  let raw = data.data_json;
-  if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch(e) { raw = []; } }
-  suggestions = Array.isArray(raw) ? raw : [];
+// 投稿1件をSupabaseに保存（個別行方式：RLS競合回避）
+async function saveSingleSuggestion(item) {
+  const { error } = await sb.from('sales_data').upsert({
+    store_key: 'sugg_' + item.id,
+    filename: 'suggestion.json',
+    data_json: item,
+    uploaded_at: item.createdAt || new Date().toISOString(),
+    uploaded_by: '__system__'
+  }, { onConflict: 'store_key' });
+  if (error) { console.error('saveSingleSuggestion error:', error); throw error; }
 }
 
-async function saveSuggestions() {
-  const { error } = await sb.from('sales_data').upsert({
-    store_key: '__suggestions',
-    filename: 'suggestions.json',
-    data_json: suggestions,
-    uploaded_at: new Date().toISOString(),
-    uploaded_by: currentUser || ''
-  }, { onConflict: 'store_key' });
+// 全投稿を読み込み（loadFromSupabaseと同じ全件取得方式）
+async function loadSuggestions() {
+  const el = document.getElementById('allSuggestionsList') || document.getElementById('mySuggestionsList');
+  const { data, error } = await sb.from('sales_data').select('store_key,data_json');
   if (error) {
-    console.error('saveSuggestions error:', error);
-    throw error;
+    console.error('loadSuggestions error:', error);
+    if (el) el.innerHTML = `<p style="color:#e74c3c;padding:12px">読み込みエラー: ${error.message}</p>`;
+    suggestions = [];
+    return;
   }
+  if (!data) { suggestions = []; return; }
+  suggestions = data
+    .filter(row => row.store_key && row.store_key.startsWith('sugg_'))
+    .map(row => {
+      let obj = row.data_json;
+      if (typeof obj === 'string') { try { obj = JSON.parse(obj); } catch(e) { return null; } }
+      return (obj && obj.id) ? obj : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 function renderSuggestions() {
@@ -2008,7 +2018,6 @@ async function submitSuggestion() {
   if (!content) { alert('内容を入力してください'); return; }
   const anon = document.getElementById('suggAnon').checked;
   const cat = document.getElementById('suggCat').value;
-  await loadSuggestions();
   const newItem = {
     id: Date.now().toString(),
     author: currentUser,
@@ -2019,16 +2028,15 @@ async function submitSuggestion() {
     createdAt: new Date().toISOString(),
     replies: []
   };
-  suggestions.push(newItem);
   try {
-    await saveSuggestions();
+    await saveSingleSuggestion(newItem);
     document.getElementById('suggContent').value = '';
     document.getElementById('suggAnon').checked = false;
     alert('送信しました！');
+    await loadSuggestions();
     renderSuggestions();
   } catch(e) {
     alert('送信に失敗しました。通信状況を確認してください。\n' + (e.message || e));
-    suggestions.pop(); // 失敗したら追加を取り消し
   }
 }
 
@@ -2039,12 +2047,12 @@ async function submitReply(suggId) {
   if (!content) { alert('返信内容を入力してください'); return; }
   await loadSuggestions();
   const s = suggestions.find(x => x.id === suggId);
-  if (!s) return;
+  if (!s) { alert('投稿が見つかりません。更新してから再試行してください。'); return; }
   s.replies = s.replies || [];
   s.replies.push({ author: currentUser, content, createdAt: new Date().toISOString() });
   s.status = 'replied';
   try {
-    await saveSuggestions();
+    await saveSingleSuggestion(s);
     alert('返信しました！');
     renderSuggestions();
   } catch(e) {
