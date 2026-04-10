@@ -1395,6 +1395,16 @@ function renderTodayStaff() {
   }
 }
 
+function fmtNoticeDate(n) {
+  if (n.datetime) {
+    const d = new Date(n.datetime);
+    const ymd = d.toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g,'/');
+    const hm  = d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+    return ymd + ' ' + hm;
+  }
+  return n.date || '';
+}
+
 function onNoticeTargetAllChange() {
   const allCb = document.getElementById('noticeTargetAll');
   document.querySelectorAll('.notice-target-store').forEach(cb => { cb.checked = allCb.checked; });
@@ -1433,7 +1443,7 @@ function renderHomeNotice() {
         <span style="font-size:14px;font-weight:700;color:#1a1a1a">${escHtml(n.title)}</span>
         ${tl ? `<span style="font-size:10px;background:#e8f0fe;color:#0f3460;padding:2px 7px;border-radius:10px;font-weight:600">${escHtml(tl)}</span>` : ''}
       </div>
-      <div style="font-size:11px;color:#aaa">${n.date} ／ ${escHtml(n.author)}</div>
+      <div style="font-size:11px;color:#aaa">${fmtNoticeDate(n)} ／ ${escHtml(n.author)}</div>
       <div style="font-size:13px;color:#555;margin-top:4px;white-space:pre-wrap">${escHtml(n.content)}</div>
     </div>`;
   }).join('');
@@ -1458,7 +1468,7 @@ function renderNoticeList() {
         <span class="notice-title">${escHtml(n.title)}</span>
         ${tl ? `<span style="font-size:10px;background:#e8f0fe;color:#0f3460;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:4px">${escHtml(tl)}</span>` : ''}
       </div>
-      <div class="notice-meta">${n.date} ／ ${escHtml(n.author)}</div>
+      <div class="notice-meta">${fmtNoticeDate(n)} ／ ${escHtml(n.author)}</div>
       <div class="notice-body">${escHtml(n.content)}</div>
     </div>`;
   }).join('');
@@ -1473,7 +1483,7 @@ function renderNoticeEditList() {
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:8px;gap:12px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.pinned ? '📌 ' : ''}${escHtml(n.title)}</div>
-        <div style="font-size:11px;color:#aaa;margin-top:2px">${n.date}
+        <div style="font-size:11px;color:#aaa;margin-top:2px">${fmtNoticeDate(n)}
           ${tl ? `<span style="background:#e8f0fe;color:#0f3460;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">${escHtml(tl)}</span>` : '<span style="background:#eee;color:#888;padding:1px 6px;border-radius:8px;margin-left:4px">全店</span>'}
         </div>
       </div>
@@ -1502,6 +1512,7 @@ async function postNotice() {
     id: Date.now().toString(),
     title, content, pinned, targets,
     date: new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g,'-'),
+    datetime: new Date().toISOString(),
     author: currentUser || ''
   };
   notices.unshift(notice);
