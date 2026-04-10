@@ -1906,37 +1906,37 @@ function scheduleDashboardUpdates() {
 // ========================================
 let suggestions = []; // { id, author, anon, category, content, status, createdAt, replies:[{author,content,createdAt}] }
 
-// 投稿1件をSupabaseに保存（XHRでiOS Safari対応、isNew=true:INSERT / false:UPDATE）
-function saveSingleSuggestion(item, isNew) {
+// 投稿1件をSupabaseに保存（isNew=true:INSERT / false:UPDATE）
+async function saveSingleSuggestion(item, isNew) {
   const key = 'sugg_' + item.id;
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    if (isNew) {
-      xhr.open('POST', SUPABASE_URL + '/rest/v1/sales_data');
-    } else {
-      xhr.open('PATCH', SUPABASE_URL + '/rest/v1/sales_data?store_key=eq.' + encodeURIComponent(key));
-    }
-    xhr.setRequestHeader('apikey', SUPABASE_KEY);
-    xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('Prefer', 'return=minimal');
-    xhr.timeout = 15000;
-    xhr.onload = function() {
-      if (this.status >= 200 && this.status < 300) {
-        resolve();
-      } else {
-        console.error('saveSingleSuggestion HTTP error:', this.status, this.responseText);
-        reject(new Error('保存エラー (' + this.status + '): ' + this.responseText));
-      }
-    };
-    xhr.onerror = function() { reject(new Error('ネットワークエラー')); };
-    xhr.ontimeout = function() { reject(new Error('タイムアウト')); };
-    const body = isNew
-      ? { store_key: key, filename: 'suggestion.json', data_json: item,
-          uploaded_at: item.createdAt || new Date().toISOString(), uploaded_by: '__system__' }
-      : { data_json: item, uploaded_at: new Date().toISOString() };
-    xhr.send(JSON.stringify(body));
-  });
+  const url = isNew
+    ? SUPABASE_URL + '/rest/v1/sales_data'
+    : SUPABASE_URL + '/rest/v1/sales_data?store_key=eq.' + encodeURIComponent(key);
+  const body = isNew
+    ? { store_key: key, filename: 'suggestion.json', data_json: item,
+        uploaded_at: item.createdAt || new Date().toISOString(), uploaded_by: '__system__' }
+    : { data_json: item, uploaded_at: new Date().toISOString() };
+  let res;
+  try {
+    res = await fetch(url, {
+      method: isNew ? 'POST' : 'PATCH',
+      mode: 'cors',
+      credentials: 'omit',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch(netErr) {
+    const nm = netErr && netErr.message ? netErr.message : String(netErr);
+    throw new Error('通信エラー: ' + nm);
+  }
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error('HTTP ' + res.status + ': ' + txt.slice(0, 120));
+  }
 }
 
 // 全投稿を読み込み（loadFromSupabaseと同じ全件取得方式）
@@ -2049,6 +2049,23 @@ async function submitSuggestion() {
     createdAt: new Date().toISOString(),
     replies: []
   };
+  // 接続テスト（GETで確認）
+  let connOk = false;
+  let connStatus = '?';
+  try {
+    const testRes = await fetch(SUPABASE_URL + '/rest/v1/sales_data?limit=1', {
+      method: 'GET', mode: 'cors', credentials: 'omit',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    connOk = testRes.ok || testRes.status < 500;
+    connStatus = 'GET:' + testRes.status;
+  } catch(e2) {
+    connStatus = 'GET失敗:' + (e2.message || String(e2));
+  }
+  if (!connOk) {
+    alert('Supabase接続エラー\n' + connStatus + '\n\nWi-Fi/通信状況を確認してください。');
+    return;
+  }
   try {
     await saveSingleSuggestion(newItem, true);
     document.getElementById('suggContent').value = '';
@@ -2057,7 +2074,7 @@ async function submitSuggestion() {
     await loadSuggestions();
     renderSuggestions();
   } catch(e) {
-    alert('送信に失敗しました。通信状況を確認してください。\n' + (e.message || e));
+    alert('送信失敗 [' + connStatus + ']\n' + (e.message || e));
   }
 }
 
