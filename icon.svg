@@ -1,24 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-  <rect width="500" height="500" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="white"/>
 
-  <!-- Samurai Beauty geometric S mark -->
-  <!-- Upper diamond: center(265,155), half=115 -->
-  <!-- Filled: top-left, top-right, bottom-left (omit bottom-right = S upper hollow) -->
-  <polygon points="265,40 150,155 265,155" fill="#231815"/>
-  <polygon points="265,40 380,155 265,155" fill="#231815"/>
-  <polygon points="265,270 150,155 265,155" fill="#231815"/>
+  <!--
+    Samurai Beauty geometric S mark
+    Two diamonds, each divided into 4 triangles by cross lines.
+    Upper diamond: 3/4 dark (omit bottom-right = top loop of S hollow)
+    Lower diamond: 3/4 dark (omit top-left  = bottom loop of S hollow)
+  -->
 
-  <!-- White dividing lines for upper diamond -->
-  <line x1="150" y1="155" x2="380" y2="155" stroke="white" stroke-width="7"/>
-  <line x1="265" y1="40"  x2="265" y2="270" stroke="white" stroke-width="7"/>
+  <!-- Upper diamond: center(272, 168), half=112 -->
+  <!-- top-left  --> <polygon points="272,56  160,168 272,168" fill="#231815"/>
+  <!-- top-right --> <polygon points="272,56  384,168 272,168" fill="#231815"/>
+  <!-- bot-left  --> <polygon points="272,280 160,168 272,168" fill="#231815"/>
+  <!-- bot-right omitted (white hollow) -->
+  <line x1="160" y1="168" x2="384" y2="168" stroke="white" stroke-width="5"/>
+  <line x1="272" y1="56"  x2="272" y2="280" stroke="white" stroke-width="5"/>
 
-  <!-- Lower diamond: center(235,345), half=115 -->
-  <!-- Filled: top-right, bottom-left, bottom-right (omit top-left = S lower hollow) -->
-  <polygon points="235,230 350,345 235,345" fill="#231815"/>
-  <polygon points="235,460 120,345 235,345" fill="#231815"/>
-  <polygon points="235,460 350,345 235,345" fill="#231815"/>
-
-  <!-- White dividing lines for lower diamond -->
-  <line x1="120" y1="345" x2="350" y2="345" stroke="white" stroke-width="7"/>
-  <line x1="235" y1="230" x2="235" y2="460" stroke="white" stroke-width="7"/>
+  <!-- Lower diamond: center(240, 344), half=112 -->
+  <!-- top-left omitted (white hollow) -->
+  <!-- top-right --> <polygon points="240,232 352,344 240,344" fill="#231815"/>
+  <!-- bot-left  --> <polygon points="240,456 128,344 240,344" fill="#231815"/>
+  <!-- bot-right --> <polygon points="240,456 352,344 240,344" fill="#231815"/>
+  <line x1="128" y1="344" x2="352" y2="344" stroke="white" stroke-width="5"/>
+  <line x1="240" y1="232" x2="240" y2="456" stroke="white" stroke-width="5"/>
 </svg>
