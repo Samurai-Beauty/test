@@ -865,7 +865,10 @@
         <!-- 管理者：全投稿一覧 -->
         <div id="allSuggestionsArea" style="display:none">
           <div class="card">
-            <div class="card-title">すべての投稿</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div class="card-title" style="margin:0">すべての投稿</div>
+              <button onclick="loadSuggestions().then(()=>renderSuggestions())" style="padding:5px 14px;border:1.5px solid #2980b9;color:#2980b9;background:#fff;border-radius:8px;cursor:pointer;font-size:12px">🔄 更新</button>
+            </div>
             <div id="allSuggestionsList"></div>
           </div>
         </div>
@@ -1897,18 +1900,27 @@ function scheduleDashboardUpdates() {
 let suggestions = []; // { id, author, anon, category, content, status, createdAt, replies:[{author,content,createdAt}] }
 
 async function loadSuggestions() {
-  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__suggestions').maybeSingle();
-  suggestions = (data && Array.isArray(data.data_json)) ? data.data_json : [];
+  const { data, error } = await sb.from('sales_data').select('data_json').eq('store_key', '__suggestions').maybeSingle();
+  if (error) { console.error('loadSuggestions error:', error); suggestions = []; return; }
+  if (!data) { suggestions = []; return; }
+  // data_json が文字列で返る場合もパース
+  let raw = data.data_json;
+  if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch(e) { raw = []; } }
+  suggestions = Array.isArray(raw) ? raw : [];
 }
 
 async function saveSuggestions() {
-  await sb.from('sales_data').upsert({
+  const { error } = await sb.from('sales_data').upsert({
     store_key: '__suggestions',
     filename: 'suggestions.json',
     data_json: suggestions,
     uploaded_at: new Date().toISOString(),
     uploaded_by: currentUser || ''
   }, { onConflict: 'store_key' });
+  if (error) {
+    console.error('saveSuggestions error:', error);
+    throw error;
+  }
 }
 
 function renderSuggestions() {
@@ -2001,11 +2013,16 @@ async function submitSuggestion() {
     replies: []
   };
   suggestions.push(newItem);
-  await saveSuggestions();
-  document.getElementById('suggContent').value = '';
-  document.getElementById('suggAnon').checked = false;
-  alert('送信しました！');
-  renderSuggestions();
+  try {
+    await saveSuggestions();
+    document.getElementById('suggContent').value = '';
+    document.getElementById('suggAnon').checked = false;
+    alert('送信しました！');
+    renderSuggestions();
+  } catch(e) {
+    alert('送信に失敗しました。通信状況を確認してください。\n' + (e.message || e));
+    suggestions.pop(); // 失敗したら追加を取り消し
+  }
 }
 
 async function submitReply(suggId) {
@@ -2019,9 +2036,15 @@ async function submitReply(suggId) {
   s.replies = s.replies || [];
   s.replies.push({ author: currentUser, content, createdAt: new Date().toISOString() });
   s.status = 'replied';
-  await saveSuggestions();
-  alert('返信しました！');
-  renderSuggestions();
+  try {
+    await saveSuggestions();
+    alert('返信しました！');
+    renderSuggestions();
+  } catch(e) {
+    s.replies.pop();
+    s.status = 'open';
+    alert('返信の保存に失敗しました。\n' + (e.message || e));
+  }
 }
 
 // ========================================
