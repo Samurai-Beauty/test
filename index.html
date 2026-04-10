@@ -288,13 +288,24 @@
     .sched-add-btn:hover { border-color: #0f3460; color: #0f3460; }
 
     /* シフト閲覧カレンダー */
-    .view-cell { min-height: 72px; pointer-events: none; }
+    .view-cell { min-height: 72px; cursor: pointer; }
+    .view-cell:active { background: #e8f0fe !important; }
     .view-staff-chip {
       display: block; background: #1a1a2e; color: white; border-radius: 4px;
-      padding: 2px 5px; font-size: 10px; margin-top: 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      padding: 2px 4px; font-size: 9px; margin-top: 2px; line-height: 1.3;
     }
     .view-staff-chip.me { background: #e2b96f; color: #1a1a2e; font-weight: 700; }
+    .chip-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chip-time { display: block; font-size: 8px; opacity: 0.85; }
+    /* シフト詳細パネル（タップ時） */
+    #viewDayDetailOverlay {
+      display: none; position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.45); align-items: flex-end; justify-content: center;
+    }
+    #viewDayDetailPanel {
+      background: #fff; border-radius: 16px 16px 0 0; width: 100%; max-height: 70vh;
+      overflow-y: auto; padding: 20px 16px 32px;
+    }
 
     /* シフトピッカーモーダル */
     .shift-picker-overlay {
@@ -943,6 +954,13 @@
   </div>
 </div>
 
+<!-- ====== シフト閲覧 日別詳細パネル ====== -->
+<div id="viewDayDetailOverlay" onclick="closeViewDayDetail()">
+  <div id="viewDayDetailPanel" onclick="event.stopPropagation()">
+    <div id="viewDayDetailBody"></div>
+  </div>
+</div>
+
 <!-- ====== シフトピッカーモーダル ====== -->
 <div class="shift-picker-overlay" id="shiftPickerOverlay" style="display:none" onclick="closeShiftPicker(event)">
   <div class="shift-picker-box" onclick="event.stopPropagation()">
@@ -1067,6 +1085,18 @@ const SHIFT_OPTIONS = [
   { key: 'omakase', label: 'お任せシフト', sub: '' },
   { key: 'off',     label: '休日希望',     sub: '' },
 ];
+
+// シフト閲覧用の短縮時間ラベル
+const SHIFT_SHORT = {
+  'h11-22': '11-22', 'h11-17': '11-17',
+  'early': '13-18',  'late':   '16-22',
+  'full':  '13-22',  'off':    '休',    'omakase': '任'
+};
+const SHIFT_LONG = {
+  'h11-22': '11:00-22:00', 'h11-17': '11:00-17:00',
+  'early': '13:00-18:00',  'late':   '16:00-22:00',
+  'full':  '13:00-22:00',  'off':    '休み',         'omakase': 'お任せ'
+};
 
 // シフト月状態
 let shiftReqMonth    = { y: 0, m: 0 };
@@ -2874,7 +2904,7 @@ function renderShiftView() {
     const holidayV = isHoliday(y, m, day);
     let cls = 'cal-cell view-cell ' + (holidayV && dow !== 0 ? 'sun' : WEEKDAY_CLS[dow]);
     if (isToday(y, m, day)) cls += ' today';
-    html += `<div class="${cls}">`;
+    html += `<div class="${cls}" onclick="showViewDayDetail(${y},${m},${day})">`;
     html += `<div class="day-num">${day}${holidayV ? '<span style="font-size:8px;color:#e74c3c;margin-left:2px">祝</span>' : ''}</div>`;
     if (staffList.length === 0) {
       html += '<span style="font-size:10px;color:#ccc">—</span>';
@@ -2882,11 +2912,13 @@ function renderShiftView() {
       staffList.forEach(name => {
         const me = name === currentUser;
         const reqKey = dayTimesV[name] || (allReqsView[name] || {})[String(day)];
+        const timeShort = reqKey ? (SHIFT_SHORT[reqKey] || '') : '';
+        const shortName = name.slice(0, 2);
         if (me) {
-          html += `<span class="view-staff-chip me">${name}</span>`;
+          html += `<span class="view-staff-chip me"><span class="chip-name">${shortName}</span>${timeShort ? `<span class="chip-time">${timeShort}</span>` : ''}</span>`;
         } else {
           const c = reqKey ? getShiftColor(reqKey) : { bg: '#1a1a2e', text: '#fff' };
-          html += `<span class="view-staff-chip" style="background:${c.bg};color:${c.text}">${name}</span>`;
+          html += `<span class="view-staff-chip" style="background:${c.bg};color:${c.text}"><span class="chip-name">${shortName}</span>${timeShort ? `<span class="chip-time">${timeShort}</span>` : ''}</span>`;
         }
       });
     }
@@ -2894,6 +2926,44 @@ function renderShiftView() {
   });
   html += '</div>';
   document.getElementById('shiftViewCalendar').innerHTML = html;
+}
+
+function showViewDayDetail(y, m, day) {
+  const sched = getSched(y, m);
+  const allStaff = sched[String(day)] || [];
+  const storeMembers = currentStore === 'honsha' ? null
+    : [...(STORE_MEMBERS[currentStore] || []), ...customStylists.filter(s => s.store === currentStore).map(s => s.name)];
+  const staffList = storeMembers ? allStaff.filter(n => storeMembers.includes(n)) : allStaff;
+  const dayTimesV = (getSchedTimes(y, m))[String(day)] || {};
+  const allReqsV = getAllReqs(y, m);
+  const dow = new Date(y, m - 1, day).getDay();
+  const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+  const holidayV = isHoliday(y, m, day);
+  let html = `<div style="font-weight:700;font-size:17px;margin-bottom:14px;color:#1a1a2e">
+    ${m}月${day}日（${DAYS[dow]}${holidayV ? '・祝' : ''}）
+  </div>`;
+  if (staffList.length === 0) {
+    html += '<p style="color:#aaa;font-size:14px;text-align:center;padding:16px 0">出勤者なし</p>';
+  } else {
+    staffList.forEach(name => {
+      const reqKey = dayTimesV[name] || (allReqsV[name] || {})[String(day)];
+      const timeLabel = reqKey ? (SHIFT_LONG[reqKey] || reqKey) : '—';
+      const c = reqKey ? getShiftColor(reqKey) : { bg: '#1a1a2e', text: '#fff' };
+      const isMe = name === currentUser;
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0">
+        <span style="background:${isMe ? '#e2b96f' : c.bg};color:${isMe ? '#1a1a2e' : c.text};
+          padding:4px 10px;border-radius:6px;font-size:13px;font-weight:${isMe ? '700' : '500'};min-width:72px;text-align:center">${name}</span>
+        <span style="font-size:15px;color:#333;font-weight:${isMe ? '700' : '400'}">${timeLabel}</span>
+      </div>`;
+    });
+  }
+  html += `<button onclick="closeViewDayDetail()" style="width:100%;margin-top:18px;padding:13px;
+    background:#0f3460;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">閉じる</button>`;
+  document.getElementById('viewDayDetailBody').innerHTML = html;
+  document.getElementById('viewDayDetailOverlay').style.display = 'flex';
+}
+function closeViewDayDetail() {
+  document.getElementById('viewDayDetailOverlay').style.display = 'none';
 }
 
 function shiftViewPrev() {
