@@ -2387,15 +2387,27 @@ function makeStaffChip(day, name, dayTimes, allReqs, extraStyle) {
 
 // 営業時間カバレッジ判定
 // 平日 13:00-22:00 / 土日 11:00-22:00
-function isCoveredDay(day, dow, staffList, dayTimes, allReqs) {
-  if (staffList.length === 0) return false;
+function isStoreCovered(storeStaff, day, dow, dayTimes, allReqs) {
+  if (storeStaff.length === 0) return false;
   const isWeekend = dow === 0 || dow === 6;
-  const shifts = staffList.map(name => dayTimes[name] || (allReqs[name] || {})[String(day)] || '');
-  // オープナー（開店カバー）
+  const shifts = storeStaff.map(name => dayTimes[name] || (allReqs[name] || {})[String(day)] || '');
   const openers = isWeekend ? ['h11-17', 'h11-22'] : ['early', 'full', 'h11-22', 'h11-17'];
-  // クローザー（閉店カバー）
   const closers = ['late', 'full', 'h11-22'];
   return shifts.some(s => openers.includes(s)) && shifts.some(s => closers.includes(s));
+}
+
+// 選択中の全店舗がそれぞれ営業時間をカバーしているか判定
+// どれか1店舗でも欠けていたら false（赤枠対象）
+function isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores) {
+  if (shiftManageStore.length <= 1) {
+    // 単一店舗モード：従来通り
+    return isStoreCovered(staffList, day, dow, dayTimes, allReqs);
+  }
+  const dayStoreMap = (schedStores || {})[String(day)] || {};
+  return shiftManageStore.every(store => {
+    const storeStaff = staffList.filter(n => (dayStoreMap[n] || getHomeStore(n)) === store);
+    return isStoreCovered(storeStaff, day, dow, dayTimes, allReqs);
+  });
 }
 
 function renderManageSchedCal(y, m) {
@@ -2417,7 +2429,7 @@ function renderManageSchedCal(y, m) {
     const { day, dow } = cell;
     const staffList = sched[String(day)] || [];
     const dayTimes = schedTimes[String(day)] || {};
-    const covered = isCoveredDay(day, dow, staffList, dayTimes, allReqs);
+    const covered = isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores);
     let cls = 'cal-cell sched-cell ' + WEEKDAY_CLS[dow];
     if (isToday(y, m, day)) cls += ' today';
     const uncoveredStyle = !covered ? 'border:2px solid #e74c3c !important;' : '';
