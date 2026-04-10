@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Samurai System マニュアル</title>
+<style>
+  @page { size: A4; margin: 12mm 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Sans', 'Meiryo', 'Yu Gothic', sans-serif;
+    font-size: 10.5pt; color: #1a1a1a; background: white;
+    line-height: 1.55;
+  }
+
+  /* ===== ページ制御 ===== */
+  .page {
+    width: 210mm; min-height: 297mm; padding: 12mm 14mm;
+    page-break-after: always; position: relative;
+  }
+  .page:last-child { page-break-after: avoid; }
+
+  /* ===== ヘッダー ===== */
+  .doc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2.5px solid #1a1a2e; padding-bottom: 6px; margin-bottom: 12px;
+  }
+  .doc-header h1 { font-size: 16pt; font-weight: 800; color: #1a1a2e; letter-spacing: .5px; }
+  .doc-header .sub { font-size: 8pt; color: #666; text-align: right; line-height: 1.6; }
+
+  /* ===== セクション ===== */
+  .section { margin-bottom: 11px; }
+  .section-title {
+    font-size: 10pt; font-weight: 800; color: white; background: #1a1a2e;
+    padding: 3px 10px; border-radius: 4px; margin-bottom: 6px; display: inline-block;
+  }
+  .section-title.honsha { background: #8e44ad; }
+  .section-title.common { background: #0f3460; }
+
+  /* ===== 2カラム ===== */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* ===== カード ===== */
+  .card {
+    border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px;
+    background: #fafafa;
+  }
+  .card h3 {
+    font-size: 9.5pt; font-weight: 700; color: #0f3460;
+    margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .card p, .card li { font-size: 9pt; color: #333; margin-bottom: 2px; }
+  .card ul, .card ol { padding-left: 14px; }
+  .card li { margin-bottom: 1px; }
+
+  /* ===== ステップ ===== */
+  .step { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 4px; }
+  .step-num {
+    background: #0f3460; color: white; width: 17px; height: 17px; border-radius: 50%;
+    font-size: 8pt; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .step-num.purple { background: #8e44ad; }
+  .step-text { font-size: 9pt; color: #333; flex: 1; }
+
+  /* ===== バッジ ===== */
+  .badge {
+    display: inline-block; font-size: 7.5pt; font-weight: 700; padding: 1px 7px;
+    border-radius: 10px; margin-right: 3px;
+  }
+  .badge-blue { background: #e8f0fe; color: #0f3460; }
+  .badge-purple { background: #f3e8fd; color: #8e44ad; }
+  .badge-orange { background: #fef3e8; color: #e67e22; }
+  .badge-green { background: #e8f5e9; color: #27ae60; }
+
+  /* ===== 区切り ===== */
+  .divider { border: none; border-top: 1px dashed #ddd; margin: 8px 0; }
+
+  /* ===== 注釈 ===== */
+  .note {
+    font-size: 8pt; color: #888; background: #f8f8f8; border-left: 3px solid #ddd;
+    padding: 4px 8px; border-radius: 0 4px 4px 0; margin-top: 5px;
+  }
+  .note strong { color: #555; }
+
+  /* ===== フッター ===== */
+  .doc-footer {
+    position: absolute; bottom: 8mm; left: 14mm; right: 14mm;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid #ddd; padding-top: 4px; font-size: 7.5pt; color: #aaa;
+  }
+
+  /* ===== シフト凡例 ===== */
+  .legend { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 4px; font-size: 8pt;
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+  }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @media screen {
+    body { background: #e0e0e0; }
+    .page { margin: 10mm auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    .print-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 999;
+      padding: 10px 22px; background: #0f3460; color: white; border: none;
+      border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">PDF保存 / 印刷</button>
+
+<!-- ========== PAGE 1: スタイリスト向け ========== -->
+<div class="page">
+
+  <div class="doc-header">
+    <h1>✂ Samurai System &nbsp; 操作マニュアル</h1>
+    <div class="sub">スタイリスト向け<br>ver. 2026.04</div>
+  </div>
+
+  <!-- ログイン -->
+  <div class="section">
+    <div class="section-title common">🔐 ログイン・初期設定</div>
+    <div class="cols">
+      <div class="card">
+        <h3>🖥 ログイン手順</h3>
+        <div class="step"><div class="step-num">1</div><div class="step-text">店舗をプルダウンで選択</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">スタイリスト名を選択</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">パスワードを入力して「ログイン」</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">「次回から自動入力」にチェックを入れると次回から省略できます</div></div>
+      </div>
+      <div class="card">
+        <h3>📱 ホーム画面への追加（推奨）</h3>
+        <div class="step"><div class="step-num">1</div><div class="step-text">Safariで <strong>samurai-beauty.github.io/test</strong> を開く</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">画面下の「共有」ボタン（四角と矢印）をタップ</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">「ホーム画面に追加」→「追加」</div></div>
+        <div class="note">アプリアイコンがホーム画面に表示されます</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- シフト希望 -->
+  <div class="section">
+    <div class="section-title common">📅 シフト希望の提出</div>
+    <div class="cols">
+      <div class="card">
+        <h3>📝 希望の入力方法</h3>
+        <div class="step"><div class="step-num">1</div><div class="step-text">左メニューの「シフト希望」をタップ</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">希望する日付をタップしてシフト時間を選択</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">「シフト希望を提出」ボタンで送信</div></div>
+        <div class="note"><strong>提出後は変更不可</strong>。再提出は本社へ連絡してください</div>
+      </div>
+      <div class="card">
+        <h3>🕐 シフト時間の種類</h3>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div><span>13:00-18:00（早番）</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2980b9"></div><span>16:00-22:00（遅番）</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2c3e50"></div><span>13:00-22:00（フル）</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div><span>11:00-17:00（土日祝）</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2c3e50"></div><span>11:00-22:00（土日祝）</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div><span>休日希望</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#7f8c8d"></div><span>おまかせ</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- シフト閲覧 -->
+  <div class="section">
+    <div class="section-title common">🗓 シフト閲覧</div>
+    <div class="cols">
+      <div class="card">
+        <h3>📆 月間カレンダーの見方</h3>
+        <ul>
+          <li><span class="badge badge-orange">金色チップ</span>自分のシフト</li>
+          <li><span class="badge badge-blue">青チップ</span>遅番スタッフ</li>
+          <li><span class="badge badge-orange">橙チップ</span>早番スタッフ</li>
+          <li>赤色の日付 = 日曜・祝日</li>
+        </ul>
+        <div class="note">チップの2行目に短縮時間が表示されます</div>
+      </div>
+      <div class="card">
+        <h3>👆 詳細を確認する方法</h3>
+        <div class="step"><div class="step-num">1</div><div class="step-text">確認したい日付のセルをタップ</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">下からパネルが開き、スタッフ名と正確な時間が表示されます</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">「閉じる」または画面外タップで戻る</div></div>
+        <div class="note">シフト公開前は「まだ公開されていません」と表示されます</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ご意見箱 -->
+  <div class="section">
+    <div class="section-title common">💬 ご意見・リクエスト</div>
+    <div class="cols">
+      <div class="card">
+        <h3>📨 送り方</h3>
+        <div class="step"><div class="step-num">1</div><div class="step-text">左メニューの「ご意見箱」をタップ</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">カテゴリを選択（リクエスト／ご意見・改善提案／その他）</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">内容を入力して「送信する」をタップ</div></div>
+        <div class="note">「匿名で送る」にチェックすると名前が非表示になります</div>
+      </div>
+      <div class="card">
+        <h3>📋 投稿の確認</h3>
+        <ul>
+          <li>「自分の投稿」に送信済みの内容が表示されます</li>
+          <li>本社から返信が届くと <span class="badge badge-blue">返信済み</span> に変わります</li>
+          <li>他のスタイリストの投稿は見えません</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- パスワード変更 -->
+  <div class="section">
+    <div class="section-title common">👤 プロフィール・パスワード変更</div>
+    <div class="card" style="max-width:100%">
+      <h3>🔑 パスワードの変更方法</h3>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div>
+          <div class="step"><div class="step-num">1</div><div class="step-text">左メニュー最下部「プロフィール」をタップ</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text">「新しいパスワード」に入力し「変更する」をタップ</div></div>
+        </div>
+        <div class="note" style="flex:1">初回ログイン後に必ず変更してください。変更後のパスワードはこの端末に保存されます</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Samurai System 操作マニュアル — スタイリスト向け</span>
+    <span>samurai-beauty.github.io/test &nbsp;|&nbsp; 1 / 2</span>
+  </div>
+</div>
+
+
+<!-- ========== PAGE 2: 本社向け ========== -->
+<div class="page">
+
+  <div class="doc-header">
+    <h1>✂ Samurai System &nbsp; 操作マニュアル</h1>
+    <div class="sub">本社・管理者向け<br>ver. 2026.04</div>
+  </div>
+
+  <!-- シフト管理 -->
+  <div class="section">
+    <div class="section-title honsha">⚙️ シフト管理（本社・店長）</div>
+    <div class="cols">
+      <div class="card">
+        <h3>📋 シフト希望の確認と反映</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">「シフト管理」→「シフト希望一覧」タブで全員の希望を確認</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">「シフト作成」タブに切り替え</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">「希望を反映」ボタンで希望を自動配置</div></div>
+        <div class="step"><div class="step-num purple">4</div><div class="step-text">カレンダー上でスタッフを追加・削除して調整</div></div>
+        <div class="step"><div class="step-num purple">5</div><div class="step-text">「シフトを公開する」でスタイリストに公開</div></div>
+        <div class="note"><strong>赤枠の日</strong> = 早番または遅番が不足している日。解消してから公開してください</div>
+      </div>
+      <div class="card">
+        <h3>🏪 複数店舗の管理</h3>
+        <ul>
+          <li>上部タブ「西新宿本店」「新宿三丁目」「渋谷東」で店舗を切り替え</li>
+          <li>複数タブを同時選択すると合算表示</li>
+          <li>赤枠は<strong>各店舗ごと</strong>に判定されます</li>
+        </ul>
+        <hr class="divider">
+        <h3>📁 CSVアップロード</h3>
+        <ul>
+          <li>既存シフト表をCSVで一括登録可能</li>
+          <li>「シフト管理」→「CSVアップロード」から実行</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- お知らせ -->
+  <div class="section">
+    <div class="section-title honsha">📢 お知らせの投稿</div>
+    <div class="cols">
+      <div class="card">
+        <h3>✏️ 投稿手順</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">「お知らせ」→「編集・投稿」タブをタップ</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">タイトルと内容を入力</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">対象店舗を選択（全店 or 特定店舗）</div></div>
+        <div class="step"><div class="step-num purple">4</div><div class="step-text">必要であれば「ピン留め」にチェック</div></div>
+        <div class="step"><div class="step-num purple">5</div><div class="step-text">「投稿する」をタップ</div></div>
+      </div>
+      <div class="card">
+        <h3>📌 ピン留めと対象店舗</h3>
+        <ul>
+          <li><span class="badge badge-purple">📌 ピン留め</span>一覧の最上部に固定表示されます</li>
+          <li>対象店舗を絞ると、指定した店舗のスタイリストにのみ表示されます</li>
+          <li>「全店」チェックで全員に表示</li>
+          <li>投稿済み一覧から削除が可能です</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ご意見箱 -->
+  <div class="section">
+    <div class="section-title honsha">💬 ご意見・リクエストへの対応</div>
+    <div class="cols">
+      <div class="card">
+        <h3>📥 確認と返信</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">「ご意見箱」をタップ（本社のみ全件表示）</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">投稿一覧から件を確認（匿名投稿は「匿名」と表示）</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">返信欄に内容を入力して「返信する」</div></div>
+        <div class="note">返信するとスタイリスト側に「返信済み」バッジが表示されます</div>
+      </div>
+      <div class="card">
+        <h3>👥 スタイリスト管理</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">「スタイリスト管理」で新規スタイリストを追加</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">名前・初期パスワード・所属店舗を設定</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">スタイリストに初期パスワードを伝え、本人がプロフィールから変更</div></div>
+        <div class="note">固定メンバー（STORE_MEMBERS）は削除不可です</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- シフト閲覧（本社） -->
+  <div class="section">
+    <div class="section-title honsha">🗓 シフト閲覧（本社）</div>
+    <div class="card" style="max-width:100%">
+      <h3>🏪 店舗フィルター機能</h3>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <ul style="flex:1">
+          <li>「全店 / 西新宿本店 / 新宿三丁目 / 渋谷東」タブで店舗を絞り込み</li>
+          <li>スタイリストには自分の店舗のシフトのみ表示されます</li>
+          <li>日付セルをタップすると全スタッフの詳細時間が確認できます</li>
+        </ul>
+        <div class="note" style="flex:1">本社はシフト公開前でも全店のシフトを閲覧できます</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- トラブルシューティング -->
+  <div class="section">
+    <div class="section-title common">❓ よくあるトラブル</div>
+    <div class="cols3">
+      <div class="card">
+        <h3>🔄 画面が古い</h3>
+        <p>画面を上から下にスワイプしてリロード。または一度ホーム画面に戻り再タップ</p>
+      </div>
+      <div class="card">
+        <h3>📶 送信エラー</h3>
+        <p>Wi-Fi・通信状況を確認。月1回程度、本社がSupabase管理画面でプロジェクトを再起動してください</p>
+      </div>
+      <div class="card">
+        <h3>🔑 パスワード忘れ</h3>
+        <p>本社がスタイリスト管理から削除→再登録して初期パスワードを再発行してください</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Samurai System 操作マニュアル — 本社・管理者向け</span>
+    <span>samurai-beauty.github.io/test &nbsp;|&nbsp; 2 / 2</span>
+  </div>
+</div>
+
+</body>
+</html>
