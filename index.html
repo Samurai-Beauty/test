@@ -978,6 +978,27 @@ const ALL_MEMBERS = DEFAULT_MEMBERS; // シフト管理などの後方互換用
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_CLS    = ['sun', '', '', '', '', '', 'sat'];
 
+// 日本の祝日（2025〜2026年）
+const HOLIDAYS = new Set([
+  // 2025年
+  '2025-1-1','2025-1-13','2025-2-11','2025-2-23','2025-2-24',
+  '2025-3-20','2025-4-29','2025-5-3','2025-5-4','2025-5-5','2025-5-6',
+  '2025-7-21','2025-8-11','2025-9-15','2025-9-23','2025-10-13',
+  '2025-11-3','2025-11-23','2025-11-24',
+  // 2026年
+  '2026-1-1','2026-1-12','2026-2-11','2026-2-23',
+  '2026-3-20','2026-4-29','2026-5-3','2026-5-4','2026-5-5',
+  '2026-7-20','2026-8-11','2026-9-21','2026-9-22','2026-9-23',
+  '2026-10-12','2026-11-3','2026-11-23',
+]);
+
+// 祝日か判定
+function isHoliday(y, m, d) { return HOLIDAYS.has(`${y}-${m}-${d}`); }
+// 土日または祝日か判定（シフト時間帯の判定に使用）
+function isHolidayOrWeekend(y, m, d, dow) {
+  return dow === 0 || dow === 6 || isHoliday(y, m, d);
+}
+
 const SHEET_ID = '1KNqCflKCCYlEmF2KMmcCXD_jRraytRlMoHI5glprKPE';
 
 const SHIFT_OPTIONS = [
@@ -2202,7 +2223,8 @@ function renderShiftRequest() {
     const { day, dow } = cell;
     const state = req[String(day)] || '';
     const past = isPast(y, m, day);
-    let cls = 'cal-cell ' + WEEKDAY_CLS[dow];
+    const holiday = isHoliday(y, m, day);
+    let cls = 'cal-cell ' + (holiday && dow !== 0 ? 'sun' : WEEKDAY_CLS[dow]);
     if (isToday(y, m, day)) cls += ' today';
     if (state === 'off') cls += ' state-off';
     else if (state !== '') cls += ' state-work';
@@ -2221,7 +2243,7 @@ function renderShiftRequest() {
     const click = past ? '' : `onclick="openShiftPicker(${day})"`;
     const cellStyle = col && state !== 'off' ? `style="background:${col.bg}22;border-color:${col.bg}"` : '';
     html += `<div class="${cls}" ${cellStyle} ${click}>`;
-    html += `<div class="day-num">${day}</div>`;
+    html += `<div class="day-num">${day}${holiday ? '<span style="font-size:8px;color:#e74c3c;margin-left:2px">祝</span>' : ''}</div>`;
     html += badgeHtml + '</div>';
   });
   html += '</div>';
@@ -2236,12 +2258,12 @@ function openShiftPicker(day) {
   const cur = req[String(day)] || '';
   shiftPickerDay = day;
 
-  // 土日判定（0=日, 6=土）
   const dow = new Date(y, m - 1, day).getDay();
-  const isWeekend = (dow === 0 || dow === 6);
+  const isWeekend = isHolidayOrWeekend(y, m, day, dow);
   const dowLabel = ['日','月','火','水','木','金','土'][dow];
+  const holidayMark = isHoliday(y, m, day) ? '（祝）' : '';
 
-  document.getElementById('shiftPickerTitle').textContent = `${y}年${m}月${day}日（${dowLabel}）`;
+  document.getElementById('shiftPickerTitle').textContent = `${y}年${m}月${day}日（${dowLabel}）${holidayMark}`;
 
   const list = document.getElementById('shiftOptionList');
   list.innerHTML = SHIFT_OPTIONS
@@ -2344,9 +2366,11 @@ function renderManageReqTable(y, m) {
   for (let d = 1; d <= cnt; d++) {
     const dow = (fd + d - 1) % 7;
     const dowLabel = WEEKDAY_LABELS[dow];
-    const rowCls = dow === 0 ? 'weekend-sun' : dow === 6 ? 'weekend-sat' : '';
-    const colStyle = dow === 0 ? 'color:#e74c3c' : dow === 6 ? 'color:#3498db' : '';
-    html += `<tr class="${rowCls}"><td class="day-cell" style="${colStyle}">${d}日(${dowLabel})</td>`;
+    const hol = isHoliday(y, m, d);
+    const rowCls = (dow === 0 || hol) ? 'weekend-sun' : dow === 6 ? 'weekend-sat' : '';
+    const colStyle = (dow === 0 || hol) ? 'color:#e74c3c' : dow === 6 ? 'color:#3498db' : '';
+    const holMark = hol ? '祝' : '';
+    html += `<tr class="${rowCls}"><td class="day-cell" style="${colStyle}">${d}日(${dowLabel}${holMark})</td>`;
     members.forEach(name => {
       const state = (allReqs[name] || {})[String(d)] || '';
       const opt = SHIFT_OPTIONS.find(o => o.key === state);
@@ -2387,9 +2411,9 @@ function makeStaffChip(day, name, dayTimes, allReqs, extraStyle) {
 
 // 営業時間カバレッジ判定
 // 平日 13:00-22:00 / 土日 11:00-22:00
-function isStoreCovered(storeStaff, day, dow, dayTimes, allReqs) {
+function isStoreCovered(storeStaff, day, dow, dayTimes, allReqs, y, m) {
   if (storeStaff.length === 0) return false;
-  const isWeekend = dow === 0 || dow === 6;
+  const isWeekend = isHolidayOrWeekend(y || 0, m || 0, day, dow);
   const shifts = storeStaff.map(name => dayTimes[name] || (allReqs[name] || {})[String(day)] || '');
   const openers = isWeekend ? ['h11-17', 'h11-22'] : ['early', 'full', 'h11-22', 'h11-17'];
   const closers = ['late', 'full', 'h11-22'];
@@ -2398,15 +2422,14 @@ function isStoreCovered(storeStaff, day, dow, dayTimes, allReqs) {
 
 // 選択中の全店舗がそれぞれ営業時間をカバーしているか判定
 // どれか1店舗でも欠けていたら false（赤枠対象）
-function isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores) {
+function isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores, y, m) {
   if (shiftManageStore.length <= 1) {
-    // 単一店舗モード：従来通り
-    return isStoreCovered(staffList, day, dow, dayTimes, allReqs);
+    return isStoreCovered(staffList, day, dow, dayTimes, allReqs, y, m);
   }
   const dayStoreMap = (schedStores || {})[String(day)] || {};
   return shiftManageStore.every(store => {
     const storeStaff = staffList.filter(n => (dayStoreMap[n] || getHomeStore(n)) === store);
-    return isStoreCovered(storeStaff, day, dow, dayTimes, allReqs);
+    return isStoreCovered(storeStaff, day, dow, dayTimes, allReqs, y, m);
   });
 }
 
@@ -2429,12 +2452,13 @@ function renderManageSchedCal(y, m) {
     const { day, dow } = cell;
     const staffList = sched[String(day)] || [];
     const dayTimes = schedTimes[String(day)] || {};
-    const covered = isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores);
-    let cls = 'cal-cell sched-cell ' + WEEKDAY_CLS[dow];
+    const covered = isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores, y, m);
+    const holiday = isHoliday(y, m, day);
+    let cls = 'cal-cell sched-cell ' + (holiday && dow !== 0 ? 'sun' : WEEKDAY_CLS[dow]);
     if (isToday(y, m, day)) cls += ' today';
     const uncoveredStyle = !covered ? 'border:2px solid #e74c3c !important;' : '';
     html += `<div class="${cls}" style="${uncoveredStyle}">`;
-    html += `<div class="day-num"><span>${day}</span>`;
+    html += `<div class="day-num"><span>${day}${holiday ? '<span style="font-size:8px;color:#e74c3c;margin-left:2px">祝</span>' : ''}</span>`;
     html += `<button class="sched-add-btn" style="width:auto;padding:1px 5px;margin:0;display:inline-block" onclick="openModal(${day})">＋</button></div>`;
     html += '<div class="staff-tags">';
 
@@ -2719,10 +2743,11 @@ function renderShiftView() {
     const allStaff = sched[String(day)] || [];
     const staffList = storeMembers ? allStaff.filter(n => storeMembers.includes(n)) : allStaff;
     const dayTimesV = schedTimesView[String(day)] || {};
-    let cls = 'cal-cell view-cell ' + WEEKDAY_CLS[dow];
+    const holidayV = isHoliday(y, m, day);
+    let cls = 'cal-cell view-cell ' + (holidayV && dow !== 0 ? 'sun' : WEEKDAY_CLS[dow]);
     if (isToday(y, m, day)) cls += ' today';
     html += `<div class="${cls}">`;
-    html += `<div class="day-num">${day}</div>`;
+    html += `<div class="day-num">${day}${holidayV ? '<span style="font-size:8px;color:#e74c3c;margin-left:2px">祝</span>' : ''}</div>`;
     if (staffList.length === 0) {
       html += '<span style="font-size:10px;color:#ccc">—</span>';
     } else {
