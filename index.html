@@ -825,6 +825,23 @@
                 <input type="checkbox" id="noticePinned" style="width:16px;height:16px">
                 <label for="noticePinned" style="font-size:13px;color:#555">📌 ピン留めする（上部に固定表示）</label>
               </div>
+              <div>
+                <label style="font-size:12px;color:#555;display:block;margin-bottom:6px;font-weight:600">対象店舗</label>
+                <div style="display:flex;flex-wrap:wrap;gap:10px">
+                  <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="noticeTargetAll" style="width:15px;height:15px;accent-color:#0f3460" checked onchange="onNoticeTargetAllChange()"> 全店
+                  </label>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" class="notice-target-store" value="nishishinjuku" style="width:15px;height:15px;accent-color:#0f3460" checked onchange="onNoticeStoreChange()"> 西新宿本店
+                  </label>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" class="notice-target-store" value="sanchome" style="width:15px;height:15px;accent-color:#0f3460" checked onchange="onNoticeStoreChange()"> 新宿三丁目
+                  </label>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" class="notice-target-store" value="shibuya" style="width:15px;height:15px;accent-color:#0f3460" checked onchange="onNoticeStoreChange()"> 渋谷東
+                  </label>
+                </div>
+              </div>
               <button class="btn-primary" onclick="postNotice()">投稿する</button>
               <div id="noticePostMsg" style="font-size:13px;display:none"></div>
             </div>
@@ -1378,61 +1395,91 @@ function renderTodayStaff() {
   }
 }
 
+function onNoticeTargetAllChange() {
+  const allCb = document.getElementById('noticeTargetAll');
+  document.querySelectorAll('.notice-target-store').forEach(cb => { cb.checked = allCb.checked; });
+}
+function onNoticeStoreChange() {
+  const all = document.querySelectorAll('.notice-target-store');
+  document.getElementById('noticeTargetAll').checked = Array.from(all).every(cb => cb.checked);
+}
+
+function noticeVisibleTo(n) {
+  if (currentStore === 'honsha') return true;
+  return !n.targets || n.targets.length === 0 || n.targets.includes(currentStore);
+}
+function noticeTargetLabel(n) {
+  if (!n.targets || n.targets.length === 0) return '';
+  return n.targets.map(s => STORE_LABELS[s] || s).join('・');
+}
+
 function renderHomeNotice() {
   const container = document.getElementById('homeNoticeList');
   if (!container) return;
-  if (notices.length === 0) {
+  const visible = notices.filter(noticeVisibleTo);
+  if (visible.length === 0) {
     container.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:20px">お知らせはまだありません</div>';
     return;
   }
-  const sorted = [...notices].sort((a, b) => {
+  const sorted = [...visible].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return new Date(b.date) - new Date(a.date);
-  }).slice(0, 5); // 最新5件
-  container.innerHTML = sorted.map(n => `
-    <div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+  }).slice(0, 5);
+  container.innerHTML = sorted.map(n => {
+    const tl = noticeTargetLabel(n);
+    return `<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
         ${n.pinned ? '<span class="pin-badge">📌</span>' : ''}
         <span style="font-size:14px;font-weight:700;color:#1a1a1a">${escHtml(n.title)}</span>
+        ${tl ? `<span style="font-size:10px;background:#e8f0fe;color:#0f3460;padding:2px 7px;border-radius:10px;font-weight:600">${escHtml(tl)}</span>` : ''}
       </div>
       <div style="font-size:11px;color:#aaa">${n.date} ／ ${escHtml(n.author)}</div>
       <div style="font-size:13px;color:#555;margin-top:4px;white-space:pre-wrap">${escHtml(n.content)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderNoticeList() {
   const container = document.getElementById('noticeList');
-  if (notices.length === 0) {
+  const visible = notices.filter(noticeVisibleTo);
+  if (visible.length === 0) {
     container.innerHTML = '<div style="color:#aaa;text-align:center;padding:40px">お知らせはまだありません</div>';
     return;
   }
-  const sorted = [...notices].sort((a, b) => {
+  const sorted = [...visible].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return new Date(b.date) - new Date(a.date);
   });
-  container.innerHTML = sorted.map(n => `
-    <div class="notice-card ${n.pinned ? 'pinned' : ''}">
+  container.innerHTML = sorted.map(n => {
+    const tl = noticeTargetLabel(n);
+    return `<div class="notice-card ${n.pinned ? 'pinned' : ''}">
       <div class="notice-header">
         ${n.pinned ? '<span class="pin-badge">📌 ピン留め</span>' : ''}
         <span class="notice-title">${escHtml(n.title)}</span>
+        ${tl ? `<span style="font-size:10px;background:#e8f0fe;color:#0f3460;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:4px">${escHtml(tl)}</span>` : ''}
       </div>
       <div class="notice-meta">${n.date} ／ ${escHtml(n.author)}</div>
       <div class="notice-body">${escHtml(n.content)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderNoticeEditList() {
   const container = document.getElementById('noticeEditList');
   if (notices.length === 0) { container.innerHTML = '<div style="color:#aaa;font-size:13px">投稿はまだありません</div>'; return; }
   const sorted = [...notices].sort((a, b) => new Date(b.date) - new Date(a.date));
-  container.innerHTML = sorted.map(n => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:8px;gap:12px">
+  container.innerHTML = sorted.map(n => {
+    const tl = noticeTargetLabel(n);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:8px;gap:12px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.pinned ? '📌 ' : ''}${escHtml(n.title)}</div>
-        <div style="font-size:11px;color:#aaa">${n.date}</div>
+        <div style="font-size:11px;color:#aaa;margin-top:2px">${n.date}
+          ${tl ? `<span style="background:#e8f0fe;color:#0f3460;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">${escHtml(tl)}</span>` : '<span style="background:#eee;color:#888;padding:1px 6px;border-radius:8px;margin-left:4px">全店</span>'}
+        </div>
       </div>
       <button onclick="deleteNotice('${n.id}')" style="padding:4px 12px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px;white-space:nowrap">削除</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function escHtml(str) {
@@ -1444,12 +1491,16 @@ async function postNotice() {
   const content = document.getElementById('noticeContent').value.trim();
   const pinned  = document.getElementById('noticePinned').checked;
   const msg     = document.getElementById('noticePostMsg');
+  // 対象店舗を収集（全店チェックなら空配列 = 全員に表示）
+  const allChecked = document.getElementById('noticeTargetAll').checked;
+  const targets = allChecked ? [] : Array.from(document.querySelectorAll('.notice-target-store:checked')).map(cb => cb.value);
 
   msg.style.display = 'block';
   if (!title || !content) { msg.style.color = '#e74c3c'; msg.textContent = 'タイトルと内容を入力してください'; return; }
+  if (!allChecked && targets.length === 0) { msg.style.color = '#e74c3c'; msg.textContent = '対象店舗を1つ以上選択してください'; return; }
   const notice = {
     id: Date.now().toString(),
-    title, content, pinned,
+    title, content, pinned, targets,
     date: new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g,'-'),
     author: currentUser || ''
   };
@@ -1458,6 +1509,8 @@ async function postNotice() {
   document.getElementById('noticeTitle').value = '';
   document.getElementById('noticeContent').value = '';
   document.getElementById('noticePinned').checked = false;
+  document.getElementById('noticeTargetAll').checked = true;
+  document.querySelectorAll('.notice-target-store').forEach(cb => cb.checked = true);
   msg.style.color = '#27ae60'; msg.textContent = '投稿しました';
   setTimeout(() => { msg.style.display = 'none'; }, 2000);
   renderNoticeEditList();
