@@ -2471,13 +2471,16 @@ function renderManageSchedCal(y, m) {
           const assigned = dayStoreMap[n] || getHomeStore(n);
           return assigned === store;
         });
-        if (storeStaff.length === 0) return;
         const sc = STORE_COLORS[store] || '#555';
         if (si > 0) html += `<div style="width:100%;margin:4px 0 2px;border-top:1px dashed #ddd"></div>`;
         html += `<div style="width:100%;font-size:9px;font-weight:800;color:${sc};margin-bottom:2px;letter-spacing:.3px">${STORE_LABELS[store]}</div>`;
-        sortStaffByTime(storeStaff, day, dayTimes, allReqs).forEach(name => {
-          html += makeStaffChip(day, name, dayTimes, allReqs, `border-left:3px solid ${sc}`);
-        });
+        if (storeStaff.length === 0) {
+          html += `<span style="font-size:9px;color:#bbb">—</span>`;
+        } else {
+          sortStaffByTime(storeStaff, day, dayTimes, allReqs).forEach(name => {
+            html += makeStaffChip(day, name, dayTimes, allReqs, `border-left:3px solid ${sc}`);
+          });
+        }
       });
     } else {
       sortStaffByTime(staffList, day, dayTimes, allReqs).forEach(name => {
