@@ -1519,11 +1519,13 @@ function doLogin() {
   const expected = getPassword(name);
   if (!expected || pass !== expected) { err.style.display = 'block'; err.textContent = 'パスワードが違います'; return; }
   err.style.display = 'none';
-  // 自動入力設定を保存
+  // 店舗・名前は常に保存、パスワードはチェック時のみ
+  localStorage.setItem('lastLoginStore', store);
+  localStorage.setItem('lastLoginName', name);
   if (document.getElementById('rememberLogin').checked) {
-    localStorage.setItem('savedLogin', JSON.stringify({ store, name, pass }));
+    localStorage.setItem('savedLoginPass', pass);
   } else {
-    localStorage.removeItem('savedLogin');
+    localStorage.removeItem('savedLoginPass');
   }
   currentUser = name;
   currentStore = store;
@@ -3018,20 +3020,19 @@ function shiftViewNext() {
 // 初期化
 // ========================================
 function restoreLoginForm() {
-  const raw = localStorage.getItem('savedLogin');
-  if (!raw) return false;
-  try {
-    const saved = JSON.parse(raw);
-    document.getElementById('loginStore').value = saved.store;
-    updateLoginMembers(saved.store);
-    document.getElementById('loginName').value = saved.name;
-    document.getElementById('loginPass').value = saved.pass;
+  const store = localStorage.getItem('lastLoginStore');
+  const name  = localStorage.getItem('lastLoginName');
+  if (!store || !name) return false;
+  document.getElementById('loginStore').value = store;
+  updateLoginMembers(store);
+  document.getElementById('loginName').value = name;
+  const savedPass = localStorage.getItem('savedLoginPass');
+  if (savedPass) {
+    document.getElementById('loginPass').value = savedPass;
     document.getElementById('rememberLogin').checked = true;
-    return true;
-  } catch(e) {
-    localStorage.removeItem('savedLogin');
-    return false;
+    return true; // パスワードあり → 自動ログイン可
   }
+  return false; // 店舗・名前のみ復元、自動ログインしない
 }
 
 window.addEventListener('load', () => {
