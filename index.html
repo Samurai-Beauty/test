@@ -413,6 +413,10 @@
     </select>
     <label for="loginPass">パスワード</label>
     <input type="password" id="loginPass" placeholder="パスワードを入力">
+    <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 16px">
+      <input type="checkbox" id="rememberLogin" style="width:16px;height:16px;cursor:pointer;accent-color:#0f3460">
+      <label for="rememberLogin" style="font-size:13px;color:#666;cursor:pointer;font-weight:400;margin:0">次回からパスワードを自動入力</label>
+    </div>
     <button class="btn-login" onclick="doLogin()">ログイン</button>
     <div class="login-error" id="loginError">スタイリスト名またはパスワードが違います</div>
   </div>
@@ -1498,6 +1502,12 @@ function doLogin() {
   const expected = getPassword(name);
   if (!expected || pass !== expected) { err.style.display = 'block'; err.textContent = 'パスワードが違います'; return; }
   err.style.display = 'none';
+  // 自動入力設定を保存
+  if (document.getElementById('rememberLogin').checked) {
+    localStorage.setItem('savedLogin', JSON.stringify({ store, name, pass }));
+  } else {
+    localStorage.removeItem('savedLogin');
+  }
   currentUser = name;
   currentStore = store;
   document.getElementById('loginScreen').style.display = 'none';
@@ -1608,8 +1618,7 @@ function doLogout() {
   clearInterval(dashboardTimer);
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
-  document.getElementById('loginPass').value = '';
-  document.getElementById('loginName').value = '';
+  restoreLoginForm(); // ログアウト後もフォームを復元（自動送信なし）
 }
 
 // ========================================
@@ -2980,11 +2989,32 @@ function shiftViewNext() {
 // ========================================
 // 初期化
 // ========================================
+function restoreLoginForm() {
+  const raw = localStorage.getItem('savedLogin');
+  if (!raw) return false;
+  try {
+    const saved = JSON.parse(raw);
+    document.getElementById('loginStore').value = saved.store;
+    updateLoginMembers(saved.store);
+    document.getElementById('loginName').value = saved.name;
+    document.getElementById('loginPass').value = saved.pass;
+    document.getElementById('rememberLogin').checked = true;
+    return true;
+  } catch(e) {
+    localStorage.removeItem('savedLogin');
+    return false;
+  }
+}
+
 window.addEventListener('load', () => {
   // Enter キーでログイン
   document.getElementById('loginPass').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   });
+  // 自動ログイン（保存済み認証情報があれば）
+  if (restoreLoginForm()) {
+    doLogin();
+  }
 });
 </script>
 </body>
