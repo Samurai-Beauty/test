@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <rect width="500" height="500" fill="white"/>
+
+  <!-- Samurai Beauty geometric S mark -->
+  <!-- Upper diamond: center(265,155), half=115 -->
+  <!-- Filled: top-left, top-right, bottom-left (omit bottom-right = S upper hollow) -->
+  <polygon points="265,40 150,155 265,155" fill="#231815"/>
+  <polygon points="265,40 380,155 265,155" fill="#231815"/>
+  <polygon points="265,270 150,155 265,155" fill="#231815"/>
+
+  <!-- White dividing lines for upper diamond -->
+  <line x1="150" y1="155" x2="380" y2="155" stroke="white" stroke-width="7"/>
+  <line x1="265" y1="40"  x2="265" y2="270" stroke="white" stroke-width="7"/>
+
+  <!-- Lower diamond: center(235,345), half=115 -->
+  <!-- Filled: top-right, bottom-left, bottom-right (omit top-left = S lower hollow) -->
+  <polygon points="235,230 350,345 235,345" fill="#231815"/>
+  <polygon points="235,460 120,345 235,345" fill="#231815"/>
+  <polygon points="235,460 350,345 235,345" fill="#231815"/>
+
+  <!-- White dividing lines for lower diamond -->
+  <line x1="120" y1="345" x2="350" y2="345" stroke="white" stroke-width="7"/>
+  <line x1="235" y1="230" x2="235" y2="460" stroke="white" stroke-width="7"/>
+</svg>
