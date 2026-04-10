@@ -2464,8 +2464,9 @@ function renderManageSchedCal(y, m) {
 
     if (multiStore) {
       const dayStoreMap = schedStores[String(day)] || {};
-      // 店舗ごとにグループ表示（出勤店舗設定を優先、なければホーム店舗）
-      shiftManageStore.forEach((store, si) => {
+      // 店舗ごとにグループ表示（常に西新宿→三丁目→渋谷の順）
+      const orderedStores = ['nishishinjuku','sanchome','shibuya'].filter(s => shiftManageStore.includes(s));
+      orderedStores.forEach((store, si) => {
         const storeStaff = staffList.filter(n => {
           const assigned = dayStoreMap[n] || getHomeStore(n);
           return assigned === store;
@@ -2557,7 +2558,8 @@ function getMembersOfStore(store) {
 }
 function getMembersForManage() {
   const result = [];
-  shiftManageStore.forEach(store => {
+  // 常に西新宿→三丁目→渋谷の順で並べる
+  ['nishishinjuku','sanchome','shibuya'].filter(s => shiftManageStore.includes(s)).forEach(store => {
     getMembersOfStore(store).forEach(n => { if (!result.includes(n)) result.push(n); });
   });
   return result;
