@@ -1906,15 +1906,27 @@ function scheduleDashboardUpdates() {
 // ========================================
 let suggestions = []; // { id, author, anon, category, content, status, createdAt, replies:[{author,content,createdAt}] }
 
-// 投稿1件をSupabaseに保存（個別行方式：RLS競合回避）
+// 投稿1件をSupabaseに保存（insert/update分離でonConflict不使用）
 async function saveSingleSuggestion(item) {
-  const { error } = await sb.from('sales_data').upsert({
-    store_key: 'sugg_' + item.id,
-    filename: 'suggestion.json',
-    data_json: item,
-    uploaded_at: item.createdAt || new Date().toISOString(),
-    uploaded_by: '__system__'
-  }, { onConflict: 'store_key' });
+  const key = 'sugg_' + item.id;
+  // 既存行チェック
+  const { data: existing } = await sb.from('sales_data').select('store_key').eq('store_key', key).maybeSingle();
+  let error;
+  if (existing) {
+    // 更新（返信追加時など）
+    ({ error } = await sb.from('sales_data')
+      .update({ data_json: item, uploaded_at: new Date().toISOString() })
+      .eq('store_key', key));
+  } else {
+    // 新規挿入
+    ({ error } = await sb.from('sales_data').insert({
+      store_key: key,
+      filename: 'suggestion.json',
+      data_json: item,
+      uploaded_at: item.createdAt || new Date().toISOString(),
+      uploaded_by: '__system__'
+    }));
+  }
   if (error) { console.error('saveSingleSuggestion error:', error); throw error; }
 }
 
