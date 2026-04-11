@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>システム構築マニュアル｜SAMURAI シフト管理システム</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    background: #f4f6f9;
+    color: #1a1a2e;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .page-wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  /* ===== ヘッダー ===== */
+  .doc-header {
+    background: linear-gradient(135deg, #0f3460 0%, #1a5276 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 36px 40px;
+    margin-bottom: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .doc-header::before {
+    content: '';
+    position: absolute;
+    right: -30px; top: -30px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(226,185,111,0.15);
+  }
+  .doc-header .tag {
+    display: inline-block;
+    background: #e2b96f;
+    color: #1a1a2e;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+  .doc-header h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .doc-header p {
+    font-size: 13px;
+    opacity: 0.85;
+  }
+
+  /* ===== 目次 ===== */
+  .toc {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    border-left: 5px solid #0f3460;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .toc h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #0f3460; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 5px 0; font-size: 13px; }
+  .toc a { color: #0f3460; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ===== 工数サマリー ===== */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .summary-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-top: 4px solid #e2b96f;
+  }
+  .summary-card .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .summary-card .value { font-size: 22px; font-weight: 800; color: #0f3460; }
+  .summary-card .unit { font-size: 12px; color: #666; }
+
+  /* ===== セクション ===== */
+  .section {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  .step-badge {
+    background: #0f3460;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+  .step-badge.gold { background: #e2b96f; color: #1a1a2e; }
+  .section h2 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f3460;
+    flex: 1;
+  }
+  .time-badge {
+    font-size: 12px;
+    color: #fff;
+    background: #27ae60;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  .time-badge.long { background: #e67e22; }
+
+  /* ===== ツール一覧 ===== */
+  .tool-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .tool-card {
+    border: 1.5px solid #e8e8e8;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .tool-card .tool-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #0f3460;
+    margin-bottom: 4px;
+  }
+  .tool-card .tool-url {
+    font-size: 11px;
+    color: #3498db;
+    margin-bottom: 6px;
+  }
+  .tool-card .tool-note { font-size: 12px; color: #555; }
+  .free-tag {
+    display: inline-block;
+    background: #eafaf1;
+    color: #27ae60;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+  }
+
+  /* ===== ステップリスト ===== */
+  .step-list { list-style: none; padding: 0; }
+  .step-list > li {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+  }
+  .step-num {
+    background: #0f3460;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+  .step-content { flex: 1; }
+  .step-content strong { color: #0f3460; }
+
+  /* ===== コードブロック ===== */
+  .code-block {
+    background: #1a1a2e;
+    color: #e2b96f;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin: 10px 0;
+    overflow-x: auto;
+    line-height: 1.8;
+  }
+  .code-block .comment { color: #7f8c8d; }
+  .code-block .key { color: #5dade2; }
+  .code-block .val { color: #a9dfbf; }
+
+  /* ===== 注意・ヒント ===== */
+  .alert {
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 13px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert.warn { background: #fef9e7; border-left: 4px solid #f39c12; }
+  .alert.info { background: #eaf4fc; border-left: 4px solid #3498db; }
+  .alert.ok   { background: #eafaf1; border-left: 4px solid #27ae60; }
+  .alert .icon { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+
+  /* ===== テーブル ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 10px 0;
+  }
+  th {
+    background: #0f3460;
+    color: #fff;
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 700;
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+  }
+  tr:hover td { background: #f8f9fa; }
+
+  /* ===== チェックリスト ===== */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .checklist li::before {
+    content: '☐';
+    color: #0f3460;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ===== 印刷 ===== */
+  .print-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #0f3460;
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .print-btn:hover { background: #1a5276; }
+  @media print {
+    .print-btn { display: none !important; }
+    body { background: #fff; }
+    .page-wrap { padding: 0; }
+    .section { box-shadow: none; border: 1px solid #eee; page-break-inside: avoid; }
+  }
+  @media (max-width: 600px) {
+    .tool-grid { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    .doc-header { padding: 24px 20px; }
+    .section { padding: 20px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- ヘッダー -->
+  <div class="doc-header">
+    <div class="tag">SAMURAI シフト管理システム</div>
+    <h1>システム構築マニュアル</h1>
+    <p>美容室向けシフト管理PWAの構築手順書　／　作成日：2026年4月</p>
+  </div>
+
+  <!-- 工数サマリー -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="label">総工数（目安）</div>
+      <div class="value">8〜12<span class="unit"> 時間</span></div>
+    </div>
+    <div class="summary-card">
+      <div class="label">月額費用</div>
+      <div class="value">¥0<span class="unit"></span></div>
+    </div>
+    <div class="summary-card">
+      <div class="label">プログラミング知識</div>
+      <div class="value" style="font-size:16px;padding-top:4px">最低限<span class="unit"></span></div>
+    </div>
+    <div class="summary-card">
+      <div class="label">必要アカウント</div>
+      <div class="value">2<span class="unit"> つ</span></div>
+    </div>
+  </div>
+
+  <!-- 目次 -->
+  <div class="toc">
+    <h2>目次</h2>
+    <ol>
+      <li><a href="#s0">システム概要・機能一覧</a></li>
+      <li><a href="#s1">STEP 1：必要なツール・アカウント準備</a>（30分）</li>
+      <li><a href="#s2">STEP 2：GitHubリポジトリ作成</a>（30分）</li>
+      <li><a href="#s3">STEP 3：Supabaseセットアップ</a>（1.5〜2時間）</li>
+      <li><a href="#s4">STEP 4：コードカスタマイズ</a>（3〜5時間）</li>
+      <li><a href="#s5">STEP 5：GitHub Pagesで公開</a>（30分）</li>
+      <li><a href="#s6">STEP 6：動作確認チェックリスト</a>（1時間）</li>
+      <li><a href="#s7">STEP 7：スタッフへの展開</a>（30分）</li>
+      <li><a href="#faq">よくあるトラブルと対処法</a></li>
+    </ol>
+  </div>
+
+  <!-- STEP 0: システム概要 -->
+  <div class="section" id="s0">
+    <div class="section-header">
+      <span class="step-badge gold">概要</span>
+      <h2>システム概要・機能一覧</h2>
+    </div>
+    <p style="margin-bottom:14px">このシステムはHTMLファイル1つで動作する美容室向けシフト管理PWA（スマホアプリ化可能なWebアプリ）です。<br>サーバーは不要で、すべて無料サービスを組み合わせて構築します。</p>
+
+    <table>
+      <tr><th>機能</th><th>内容</th><th>利用者</th></tr>
+      <tr><td>シフト希望提出</td><td>スタイリストが毎月のシフト希望を入力・送信</td><td>スタイリスト</td></tr>
+      <tr><td>シフト管理・確定</td><td>希望をもとに管理者がシフトを編集・確定</td><td>本社・店舗管理者</td></tr>
+      <tr><td>シフト閲覧</td><td>確定シフトをカレンダー表示（店舗別）</td><td>全員</td></tr>
+      <tr><td>お知らせ</td><td>本社・管理者からのお知らせ投稿・閲覧</td><td>全員</td></tr>
+      <tr><td>スタイリスト管理</td><td>スタッフの追加・削除・店舗割り当て</td><td>本社・管理者</td></tr>
+      <tr><td>資料共有</td><td>PDFなどのファイルをアップロード・共有</td><td>全員</td></tr>
+      <tr><td>売上管理</td><td>CSVアップロードによる売上データ集計</td><td>本社のみ</td></tr>
+      <tr><td>ご意見箱</td><td>スタイリストから本社への匿名投稿</td><td>全員</td></tr>
+    </table>
+
+    <div class="alert info" style="margin-top:16px">
+      <span class="icon">🏗️</span>
+      <div><strong>技術構成：</strong>フロントエンド = HTML / CSS / JavaScript（フレームワーク不使用）、データ保存 = Supabase（PostgreSQL + ファイルStorage）、ホスティング = GitHub Pages</div>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <span class="step-badge">STEP 1</span>
+      <h2>必要なツール・アカウント準備</h2>
+      <span class="time-badge">約30分</span>
+    </div>
+
+    <div class="tool-grid">
+      <div class="tool-card">
+        <div class="tool-name">GitHub <span class="free-tag">無料</span></div>
+        <div class="tool-url">github.com</div>
+        <div class="tool-note">コードの管理・公開に使用。アカウント未作成の場合は新規登録。</div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">Supabase <span class="free-tag">無料</span></div>
+        <div class="tool-url">supabase.com</div>
+        <div class="tool-note">データベース・ファイルStorage。無料枠で十分運用可能（月500MB）。</div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">VS Code（推奨）<span class="free-tag">無料</span></div>
+        <div class="tool-url">code.visualstudio.com</div>
+        <div class="tool-note">コード編集用エディタ。メモ帳でも可だが作業効率が大幅に上がる。</div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">Git</div>
+        <div class="tool-url">git-scm.com（Windows）</div>
+        <div class="tool-note">Macは標準搭載。WindowsはGit for Windowsをインストール。</div>
+      </div>
+    </div>
+
+    <div class="alert warn" style="margin-top:16px">
+      <span class="icon">⚠️</span>
+      <div>GitHubとSupabaseはそれぞれ無料プランで全機能使用可能です。クレジットカード登録は不要です。</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <span class="step-badge">STEP 2</span>
+      <h2>GitHubリポジトリ作成</h2>
+      <span class="time-badge">約30分</span>
+    </div>
+    <ul class="step-list">
+      <li>
+        <span class="step-num">1</span>
+        <div class="step-content">GitHubにログインし、右上「＋」→「New repository」をクリック</div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div class="step-content">Repository name を入力（例：<code>salon-shift</code>）、<strong>Public</strong>を選択（GitHub Pages無料公開に必要）</div>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <div class="step-content">「Add a README file」にチェックを入れて「Create repository」をクリック</div>
+      </li>
+      <li>
+        <span class="step-num">4</span>
+        <div class="step-content">ローカルPCにクローン：<br>
+          <div class="code-block">git clone https://github.com/あなたのID/salon-shift.git<br>cd salon-shift</div>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">5</span>
+        <div class="step-content">元のシステムの <strong>index.html</strong> をフォルダにコピー</div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <span class="step-badge">STEP 3</span>
+      <h2>Supabaseセットアップ</h2>
+      <span class="time-badge long">1.5〜2時間</span>
+    </div>
+    <p style="margin-bottom:16px">最も時間がかかるステップです。丁寧に進めてください。</p>
+
+    <p style="font-weight:700;margin-bottom:10px;color:#0f3460">① プロジェクト作成</p>
+    <ul class="step-list">
+      <li><span class="step-num">1</span><div class="step-content">supabase.com にログインし「New Project」をクリック</div></li>
+      <li><span class="step-num">2</span><div class="step-content">プロジェクト名・パスワード・リージョン（Northeast Asia推奨）を設定して作成（2〜3分かかる）</div></li>
+      <li><span class="step-num">3</span><div class="step-content">「Project Settings」→「API」から <strong>Project URL</strong> と <strong>anon public key</strong> をメモしておく</div></li>
+    </ul>
+
+    <p style="font-weight:700;margin:16px 0 10px;color:#0f3460">② テーブル作成</p>
+    <p style="font-size:13px;margin-bottom:8px">左メニュー「SQL Editor」を開き、以下を実行：</p>
+    <div class="code-block"><span class="comment">-- データ保存テーブル作成</span>
+CREATE TABLE public.sales_data (
+  id          bigserial PRIMARY KEY,
+  store_key   text NOT NULL,
+  filename    text,
+  data_json   jsonb,
+  uploaded_at timestamptz DEFAULT now(),
+  uploaded_by text
+);
+
+<span class="comment">-- シフト重複防止のUNIQUE制約（必須）</span>
+ALTER TABLE public.sales_data
+  ADD CONSTRAINT sales_data_store_key_unique
+  UNIQUE (store_key);</div>
+
+    <p style="font-weight:700;margin:16px 0 10px;color:#0f3460">③ RLS（行レベルセキュリティ）を無効化</p>
+    <ul class="step-list">
+      <li><span class="step-num">1</span><div class="step-content">左メニュー「Table Editor」→「sales_data」テーブルを選択</div></li>
+      <li><span class="step-num">2</span><div class="step-content">右上の「RLS enabled」ボタンをクリック→「Disable RLS」を選択</div></li>
+    </ul>
+    <div class="alert warn">
+      <span class="icon">⚠️</span>
+      <div>RLSを無効化しないとデータの保存・読み込みが全て失敗します。必ず実行してください。</div>
+    </div>
+
+    <p style="font-weight:700;margin:16px 0 10px;color:#0f3460">④ Storage（ファイル保存）セットアップ</p>
+    <ul class="step-list">
+      <li><span class="step-num">1</span><div class="step-content">左メニュー「Storage」→「New bucket」をクリック</div></li>
+      <li><span class="step-num">2</span><div class="step-content">Bucket name：<strong>documents</strong>、Public bucket：<strong>ON</strong>にして作成</div></li>
+      <li><span class="step-num">3</span><div class="step-content">SQL Editorで以下を実行してアップロード権限を付与：
+        <div class="code-block">CREATE POLICY "allow all"
+  ON storage.objects FOR ALL TO public
+  USING (bucket_id = 'documents')
+  WITH CHECK (bucket_id = 'documents');</div>
+      </div></li>
+    </ul>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <span class="step-badge">STEP 4</span>
+      <h2>コードカスタマイズ</h2>
+      <span class="time-badge long">3〜5時間</span>
+    </div>
+    <p style="margin-bottom:16px">index.html をエディタで開き、以下の箇所を上から順に書き換えます。<br>
+    <strong>「Ctrl+F（Mac: Cmd+F）」で検索しながら進めると効率的です。</strong></p>
+
+    <p style="font-weight:700;margin-bottom:8px;color:#0f3460">① Supabase接続情報（必須）</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">検索ワード：<code>SUPABASE_URL</code></p>
+    <div class="code-block"><span class="key">const</span> <span class="val">SUPABASE_URL</span> = '<span style="color:#e74c3c">★ここにProject URLを貼る★</span>';
+<span class="key">const</span> <span class="val">SUPABASE_KEY</span> = '<span style="color:#e74c3c">★ここにanon public keyを貼る★</span>';</div>
+
+    <p style="font-weight:700;margin:20px 0 8px;color:#0f3460">② 店舗情報の設定（必須）</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">検索ワード：<code>STORE_LABELS</code></p>
+    <div class="code-block"><span class="comment">// 店舗のキー名と表示名</span>
+<span class="key">const</span> STORE_LABELS = {
+  honsha:   '<span style="color:#e74c3c">本社</span>',
+  store1:   '<span style="color:#e74c3c">○○店</span>',       <span class="comment">// ← 実際の店舗名に変更</span>
+  store2:   '<span style="color:#e74c3c">△△店</span>',
+  store3:   '<span style="color:#e74c3c">□□店</span>',
+};</div>
+
+    <div class="alert info">
+      <span class="icon">💡</span>
+      <div>店舗のキー名（<code>store1</code>など）はアルファベットで設定します。表示名（<code>○○店</code>）は日本語でOKです。STORE_COLORSで各店舗のカラーも変更できます。</div>
+    </div>
+
+    <p style="font-weight:700;margin:20px 0 8px;color:#0f3460">③ スタッフ・パスワードの設定（必須）</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">検索ワード：<code>STORE_MEMBERS</code></p>
+    <div class="code-block"><span class="key">const</span> STORE_MEMBERS = {
+  honsha:  ['<span style="color:#e74c3c">管理者A</span>', '<span style="color:#e74c3c">管理者B</span>'],
+  store1:  ['<span style="color:#e74c3c">スタッフA</span>', '<span style="color:#e74c3c">スタッフB</span>', '<span style="color:#e74c3c">スタッフC</span>'],
+  store2:  ['<span style="color:#e74c3c">スタッフD</span>', '<span style="color:#e74c3c">スタッフE</span>'],
+  store3:  ['<span style="color:#e74c3c">スタッフF</span>'],
+};</div>
+
+    <p style="font-size:12px;color:#888;margin:12px 0 6px">検索ワード：<code>DEFAULT_PASSWORDS</code></p>
+    <div class="code-block"><span class="key">const</span> DEFAULT_PASSWORDS = {
+  '<span style="color:#e74c3c">管理者A</span>': '<span style="color:#e74c3c">Salon.2025</span>',  <span class="comment">// 任意のパスワードに変更</span>
+  '<span style="color:#e74c3c">スタッフA</span>': '<span style="color:#e74c3c">Salon.2025</span>',
+  <span class="comment">// 全員分設定する</span>
+};</div>
+
+    <p style="font-weight:700;margin:20px 0 8px;color:#0f3460">④ FCオーナー（店舗限定管理者）の設定（任意）</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">検索ワード：<code>STORE_MANAGERS</code></p>
+    <div class="code-block"><span class="key">const</span> STORE_MANAGERS = {
+  store3: ['<span style="color:#e74c3c">スタッフF</span>'],  <span class="comment">// store3のみ管理できるオーナー</span>
+};</div>
+
+    <p style="font-weight:700;margin:20px 0 8px;color:#0f3460">⑤ 初期シフトデータの削除（必須）</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">検索ワード：<code>seedMay2026IfNeeded</code></p>
+    <div class="code-block"><span class="comment">// この関数の中身（サンプルデータ）を空にする</span>
+<span class="key">function</span> seedMay2026IfNeeded() {
+  <span class="comment">// 何も書かなくてOK（空のままにする）</span>
+}</div>
+    <div class="alert warn">
+      <span class="icon">⚠️</span>
+      <div>元のシステムには別サロンのサンプルシフトデータが入っています。そのまま使うと他サロンのデータが混入します。必ず空にしてください。</div>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <span class="step-badge">STEP 5</span>
+      <h2>GitHub Pagesで公開</h2>
+      <span class="time-badge">約30分</span>
+    </div>
+    <ul class="step-list">
+      <li>
+        <span class="step-num">1</span>
+        <div class="step-content">変更したファイルをGitHubにアップロード：
+          <div class="code-block">git add index.html<br>git commit -m "初期設定"<br>git push origin main</div>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div class="step-content">GitHubのリポジトリページで「Settings」→「Pages」を開く</div>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <div class="step-content">「Source」で「Deploy from a branch」、Branch で「main」/「root」を選択して「Save」</div>
+      </li>
+      <li>
+        <span class="step-num">4</span>
+        <div class="step-content">数分後、<code>https://あなたのID.github.io/salon-shift/</code> でアクセス可能になる</div>
+      </li>
+    </ul>
+    <div class="alert ok">
+      <span class="icon">✅</span>
+      <div>このURLがシステムのアドレスになります。スマホのホーム画面に追加すればアプリのように使えます。</div>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <span class="step-badge">STEP 6</span>
+      <h2>動作確認チェックリスト</h2>
+      <span class="time-badge">約1時間</span>
+    </div>
+    <p style="margin-bottom:14px">本番公開前に以下の項目を順番に確認してください：</p>
+    <ul class="checklist">
+      <li>本社アカウントでログインできる</li>
+      <li>スタイリストアカウントでログインできる</li>
+      <li>シフト希望を提出できる（スタイリストで）</li>
+      <li>シフトが管理画面に反映されている（本社で）</li>
+      <li>シフトを確定してスタイリスト閲覧画面に表示される</li>
+      <li>お知らせを投稿・閲覧できる</li>
+      <li>スタイリストを追加・削除できる（本社で）</li>
+      <li>資料をアップロードしてダウンロードできる</li>
+      <li>ページをリロードしてもデータが消えない（Supabase保存確認）</li>
+      <li>スマホからアクセスして正常に表示される</li>
+      <li>FCオーナーがある場合、担当店舗のみ表示される</li>
+    </ul>
+
+    <div class="alert warn" style="margin-top:16px">
+      <span class="icon">⚠️</span>
+      <div>リロード後にデータが消える場合は Supabase のRLS設定かUNIQUE制約が正しく設定されていない可能性があります。STEP 3 を見直してください。</div>
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <span class="step-badge">STEP 7</span>
+      <h2>スタッフへの展開</h2>
+      <span class="time-badge">約30分</span>
+    </div>
+    <ul class="step-list">
+      <li>
+        <span class="step-num">1</span>
+        <div class="step-content">URLとログイン情報（名前・パスワード）を各スタッフに伝える</div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div class="step-content"><strong>スマホのホーム画面への追加を案内：</strong>
+          <br>iOS（Safari）：共有ボタン →「ホーム画面に追加」
+          <br>Android（Chrome）：メニュー →「ホーム画面に追加」
+        </div>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <div class="step-content">初回ログイン後にパスワードをメモ・保存するよう案内（ブラウザのパスワード保存機能を使うと便利）</div>
+      </li>
+    </ul>
+    <div class="alert ok">
+      <span class="icon">✅</span>
+      <div>パスワードはコード内の DEFAULT_PASSWORDS に直接書くため、スタッフ全員に同じ初期パスワードを設定して、後から変更する運用も可能です。</div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section" id="faq">
+    <div class="section-header">
+      <span class="step-badge gold">FAQ</span>
+      <h2>よくあるトラブルと対処法</h2>
+    </div>
+    <table>
+      <tr>
+        <th width="35%">症状</th>
+        <th>原因と対処法</th>
+      </tr>
+      <tr>
+        <td>保存してもリロードで消える</td>
+        <td>Supabase の RLS が有効のまま。「STEP 3 ③」を確認してRLSを無効化する</td>
+      </tr>
+      <tr>
+        <td>「400エラー」が表示される</td>
+        <td>sales_data テーブルに UNIQUE 制約がない。「STEP 3 ②」のSQLを再実行</td>
+      </tr>
+      <tr>
+        <td>ファイルアップロードが失敗する</td>
+        <td>Storageのポリシーが設定されていない。「STEP 3 ④」のSQLを再実行</td>
+      </tr>
+      <tr>
+        <td>ページが真っ白で表示されない</td>
+        <td>SUPABASE_URL か SUPABASE_KEY が間違っている。コピペミスを確認</td>
+      </tr>
+      <tr>
+        <td>ログインできないスタッフがいる</td>
+        <td>STORE_MEMBERS か DEFAULT_PASSWORDS のスペル・全角半角を確認</td>
+      </tr>
+      <tr>
+        <td>スマホで画面が崩れる</td>
+        <td>古いブラウザの場合あり。Safari / Chrome の最新版にアップデート</td>
+      </tr>
+      <tr>
+        <td>GitHubにpushできない</td>
+        <td>Gitの認証エラー。Personal Access Token を生成して使用（GitHub Settings → Developer settings）</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 工数まとめ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-badge gold">まとめ</span>
+      <h2>工数まとめ</h2>
+    </div>
+    <table>
+      <tr><th>ステップ</th><th>内容</th><th>目安時間</th></tr>
+      <tr><td>STEP 1</td><td>ツール・アカウント準備</td><td>30分</td></tr>
+      <tr><td>STEP 2</td><td>GitHubリポジトリ作成</td><td>30分</td></tr>
+      <tr><td>STEP 3</td><td>Supabaseセットアップ</td><td>1.5〜2時間</td></tr>
+      <tr><td>STEP 4</td><td>コードカスタマイズ</td><td>3〜5時間</td></tr>
+      <tr><td>STEP 5</td><td>GitHub Pagesで公開</td><td>30分</td></tr>
+      <tr><td>STEP 6</td><td>動作確認</td><td>1時間</td></tr>
+      <tr><td>STEP 7</td><td>スタッフへの展開</td><td>30分</td></tr>
+      <tr style="font-weight:700;background:#f8f9fa">
+        <td colspan="2">合計（目安）</td>
+        <td style="color:#0f3460;font-size:16px">8〜10時間</td>
+      </tr>
+    </table>
+    <div class="alert info" style="margin-top:16px">
+      <span class="icon">💡</span>
+      <div>プログラミング経験のある方なら4〜6時間でも完了可能です。コード編集に不慣れな場合は余裕を持って2日間に分けて作業することをお勧めします。</div>
+    </div>
+  </div>
+
+</div>
+
+<button class="print-btn" onclick="window.print()">PDF保存 / 印刷</button>
+</body>
+</html>
