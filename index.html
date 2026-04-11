@@ -3444,6 +3444,7 @@ function renderShiftView() {
   const allowedStores = getAllowedViewStores();
   document.querySelectorAll('#shiftViewStoreTabs .sview-tab').forEach(btn => {
     btn.style.display = allowedStores.includes(btn.dataset.store) ? '' : 'none';
+    btn.classList.toggle('active', shiftViewStores.includes(btn.dataset.store));
   });
   document.getElementById('shiftViewStoreTabs').style.display = allowedStores.length > 1 ? 'flex' : 'none';
 
