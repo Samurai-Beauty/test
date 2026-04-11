@@ -829,6 +829,16 @@
                 <label for="noticePinned" style="font-size:13px;color:#555">📌 ピン留めする（上部に固定表示）</label>
               </div>
               <div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <input type="checkbox" id="noticeScheduled" style="width:16px;height:16px" onchange="toggleScheduledInput()">
+                  <label for="noticeScheduled" style="font-size:13px;color:#555;cursor:pointer">⏰ 予約投稿（公開日時を指定）</label>
+                </div>
+                <div id="noticeScheduledArea" style="display:none">
+                  <input type="datetime-local" id="noticePublishAt" style="padding:8px 12px;border:1.5px solid #8e44ad;border-radius:8px;font-size:14px;color:#8e44ad;font-weight:600">
+                  <div style="font-size:11px;color:#888;margin-top:4px">指定日時になるまでスタイリストには表示されません</div>
+                </div>
+              </div>
+              <div>
                 <label style="font-size:12px;color:#555;display:block;margin-bottom:6px;font-weight:600">対象店舗</label>
                 <div style="display:flex;flex-wrap:wrap;gap:10px">
                   <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
@@ -1670,6 +1680,19 @@ function fmtNoticeDate(n) {
   return n.date || '';
 }
 
+function toggleScheduledInput() {
+  const checked = document.getElementById('noticeScheduled').checked;
+  const area = document.getElementById('noticeScheduledArea');
+  area.style.display = checked ? 'block' : 'none';
+  if (checked && !document.getElementById('noticePublishAt').value) {
+    // デフォルト: 翌日の09:00
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0);
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('noticePublishAt').value =
+      `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T09:00`;
+  }
+}
+
 function onNoticeTargetAllChange() {
   const allCb = document.getElementById('noticeTargetAll');
   document.querySelectorAll('.notice-target-store').forEach(cb => { cb.checked = allCb.checked; });
@@ -1680,6 +1703,8 @@ function onNoticeStoreChange() {
 }
 
 function noticeVisibleTo(n) {
+  // 予約投稿: 本社は常に見える、スタイリストは公開日時以降のみ
+  if (n.publishAt && currentStore !== 'honsha' && new Date() < new Date(n.publishAt)) return false;
   if (currentStore === 'honsha') return true;
   return !n.targets || n.targets.length === 0 || n.targets.includes(currentStore);
 }
@@ -1745,9 +1770,18 @@ function renderNoticeEditList() {
   const sorted = [...notices].sort((a, b) => new Date(b.date) - new Date(a.date));
   container.innerHTML = sorted.map(n => {
     const tl = noticeTargetLabel(n);
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:8px;gap:12px">
+    const isScheduled = n.publishAt && new Date() < new Date(n.publishAt);
+    const scheduledLabel = isScheduled
+      ? new Date(n.publishAt).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+      : null;
+    const rowBg = isScheduled ? '#fdf3ff' : '#f8f9fa';
+    const rowBorder = isScheduled ? 'border:1.5px solid #d7aef5;' : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:${rowBg};${rowBorder}margin-bottom:8px;gap:12px">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.pinned ? '📌 ' : ''}${escHtml(n.title)}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.pinned ? '📌 ' : ''}${escHtml(n.title)}</span>
+          ${isScheduled ? `<span style="font-size:10px;background:#8e44ad;color:#fff;padding:2px 7px;border-radius:10px;font-weight:700;white-space:nowrap">⏰ 予約中 ${scheduledLabel}</span>` : ''}
+        </div>
         <div style="font-size:11px;color:#aaa;margin-top:2px">${fmtNoticeDate(n)}
           ${tl ? `<span style="background:#e8f0fe;color:#0f3460;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">${escHtml(tl)}</span>` : '<span style="background:#eee;color:#888;padding:1px 6px;border-radius:8px;margin-left:4px">全店</span>'}
         </div>
@@ -1773,9 +1807,13 @@ async function postNotice() {
   msg.style.display = 'block';
   if (!title || !content) { msg.style.color = '#e74c3c'; msg.textContent = 'タイトルと内容を入力してください'; return; }
   if (!allChecked && targets.length === 0) { msg.style.color = '#e74c3c'; msg.textContent = '対象店舗を1つ以上選択してください'; return; }
+  const scheduled = document.getElementById('noticeScheduled').checked;
+  const publishAtVal = scheduled ? document.getElementById('noticePublishAt').value : null;
+  if (scheduled && !publishAtVal) { msg.style.color = '#e74c3c'; msg.textContent = '公開日時を入力してください'; return; }
   const notice = {
     id: Date.now().toString(),
     title, content, pinned, targets,
+    publishAt: publishAtVal ? new Date(publishAtVal).toISOString() : null,
     date: new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g,'-'),
     datetime: new Date().toISOString(),
     author: currentUser || ''
@@ -1786,9 +1824,16 @@ async function postNotice() {
   document.getElementById('noticeTitle').value = '';
   document.getElementById('noticeContent').value = '';
   document.getElementById('noticePinned').checked = false;
+  document.getElementById('noticeScheduled').checked = false;
+  document.getElementById('noticeScheduledArea').style.display = 'none';
+  document.getElementById('noticePublishAt').value = '';
   document.getElementById('noticeTargetAll').checked = true;
   document.querySelectorAll('.notice-target-store').forEach(cb => cb.checked = true);
-  msg.style.color = '#27ae60'; msg.textContent = '投稿しました';
+  const isScheduled = notice.publishAt && new Date(notice.publishAt) > new Date();
+  msg.style.color = '#27ae60';
+  msg.textContent = isScheduled
+    ? `予約しました（${new Date(notice.publishAt).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})} 公開）`
+    : '投稿しました';
   setTimeout(() => { msg.style.display = 'none'; }, 2000);
   renderNoticeEditList();
   renderNoticeList();
