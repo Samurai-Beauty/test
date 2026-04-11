@@ -782,10 +782,9 @@
 
         <!-- 本社のみ：店舗フィルタータブ -->
         <div id="shiftViewStoreTabs" style="display:none;margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">
-          <button class="sview-tab active" data-store="all"     onclick="setShiftViewStore('all')">全店</button>
-          <button class="sview-tab"        data-store="nishishinjuku" onclick="setShiftViewStore('nishishinjuku')">西新宿本店</button>
-          <button class="sview-tab"        data-store="sanchome"      onclick="setShiftViewStore('sanchome')">新宿三丁目</button>
-          <button class="sview-tab"        data-store="shibuya"       onclick="setShiftViewStore('shibuya')">渋谷東</button>
+          <button class="sview-tab active" data-store="nishishinjuku" onclick="toggleShiftViewStore('nishishinjuku')">西新宿本店</button>
+          <button class="sview-tab active" data-store="sanchome"      onclick="toggleShiftViewStore('sanchome')">新宿三丁目</button>
+          <button class="sview-tab active" data-store="shibuya"       onclick="toggleShiftViewStore('shibuya')">渋谷東</button>
         </div>
 
         <div id="shiftViewNotice" style="display:none" class="card"></div>
@@ -1214,7 +1213,7 @@ function shiftLong(key) {
 let shiftReqMonth    = { y: 0, m: 0 };
 let shiftManageMonth = { y: 0, m: 0 };
 let shiftViewMonth   = { y: 0, m: 0 };
-let shiftViewFilter  = 'all'; // 'all' or store key (honsha only)
+let shiftViewStores = ['nishishinjuku', 'sanchome', 'shibuya']; // 複数選択可（本社）
 let shiftManageTab   = 'requests';
 let shiftManageStore = ['nishishinjuku'];
 let modalDay         = null;
@@ -3391,14 +3390,21 @@ function renderShiftView() {
   tabs.style.display = isHonshaView ? 'flex' : 'none';
 
   // 表示対象メンバーを決定
-  const filterStore = isHonshaView ? shiftViewFilter : currentStore;
   let storeMembers;
-  if (filterStore === 'all') {
-    storeMembers = null; // 全員
-  } else {
-    const base = STORE_MEMBERS[filterStore] || [];
-    const custom = customStylists.filter(s => s.store === filterStore).map(s => s.name);
+  if (!isHonshaView) {
+    const base = STORE_MEMBERS[currentStore] || [];
+    const custom = customStylists.filter(s => s.store === currentStore).map(s => s.name);
     storeMembers = [...base, ...custom];
+  } else {
+    // 選択中の店舗のメンバーを合算
+    const selected = shiftViewStores.length > 0 ? shiftViewStores : ['nishishinjuku','sanchome','shibuya'];
+    const members = [];
+    selected.forEach(sk => {
+      const base = STORE_MEMBERS[sk] || [];
+      const custom = customStylists.filter(s => s.store === sk).map(s => s.name);
+      [...base, ...custom].forEach(n => { if (!members.includes(n)) members.push(n); });
+    });
+    storeMembers = members;
   }
 
   const sched = getSched(y, m);
@@ -3441,9 +3447,19 @@ function renderShiftView() {
 function showViewDayDetail(y, m, day) {
   const sched = getSched(y, m);
   const allStaff = sched[String(day)] || [];
-  const storeMembers = currentStore === 'honsha' ? null
-    : [...(STORE_MEMBERS[currentStore] || []), ...customStylists.filter(s => s.store === currentStore).map(s => s.name)];
-  const staffList = storeMembers ? allStaff.filter(n => storeMembers.includes(n)) : allStaff;
+  let storeMembers;
+  if (currentStore !== 'honsha') {
+    storeMembers = [...(STORE_MEMBERS[currentStore] || []), ...customStylists.filter(s => s.store === currentStore).map(s => s.name)];
+  } else {
+    const selected = shiftViewStores.length > 0 ? shiftViewStores : ['nishishinjuku','sanchome','shibuya'];
+    storeMembers = [];
+    selected.forEach(sk => {
+      const base = STORE_MEMBERS[sk] || [];
+      const custom = customStylists.filter(s => s.store === sk).map(s => s.name);
+      [...base, ...custom].forEach(n => { if (!storeMembers.includes(n)) storeMembers.push(n); });
+    });
+  }
+  const staffList = allStaff.filter(n => storeMembers.includes(n));
   const dayTimesV = (getSchedTimes(y, m))[String(day)] || {};
   const allReqsV = getAllReqs(y, m);
   const dow = new Date(y, m - 1, day).getDay();
@@ -3476,10 +3492,16 @@ function closeViewDayDetail() {
   document.getElementById('viewDayDetailOverlay').style.display = 'none';
 }
 
-function setShiftViewStore(store) {
-  shiftViewFilter = store;
-  document.querySelectorAll('.sview-tab').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.store === store);
+function toggleShiftViewStore(store) {
+  const idx = shiftViewStores.indexOf(store);
+  if (idx === -1) {
+    shiftViewStores.push(store);
+  } else {
+    if (shiftViewStores.length === 1) return; // 最低1店舗は選択維持
+    shiftViewStores.splice(idx, 1);
+  }
+  document.querySelectorAll('#shiftViewStoreTabs .sview-tab').forEach(btn => {
+    btn.classList.toggle('active', shiftViewStores.includes(btn.dataset.store));
   });
   renderShiftView();
 }
