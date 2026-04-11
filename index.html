@@ -1284,6 +1284,8 @@ const STORE_COLORS = {
 
 let currentUser = null;
 let currentStore = null;
+let currentRole = 'stylist'; // 'honsha' | 'fc_owner' | 'stylist'
+function isFCOwner() { return currentRole === 'fc_owner'; }
 let storeData = { honsha: null, nishishinjuku: null, sanchome: null, shibuya: null };
 let dashboardTimer = null;
 
@@ -1622,7 +1624,21 @@ function switchNoticeTab(tab) {
   document.getElementById('noticePanelEdit').style.display = tab === 'edit' ? 'block' : 'none';
   document.getElementById('noticeTabView').classList.toggle('active', tab === 'view');
   document.getElementById('noticeTabEdit').classList.toggle('active', tab === 'edit');
-  if (tab === 'edit') renderNoticeEditList();
+  if (tab === 'edit') {
+    renderNoticeEditList();
+    applyNoticeTargetRestriction();
+  }
+}
+// FCオーナーは自店舗のみ対象にロック
+function applyNoticeTargetRestriction() {
+  const isFC = isFCOwner();
+  const allCb = document.getElementById('noticeTargetAll');
+  document.querySelectorAll('.notice-target-store').forEach(cb => {
+    cb.disabled = isFC && cb.value !== currentStore;
+    cb.checked  = isFC ? cb.value === currentStore : cb.checked;
+  });
+  if (isFC) { allCb.checked = false; allCb.disabled = true; }
+  else { allCb.disabled = false; }
 }
 
 function renderTodayStaff() {
@@ -1873,6 +1889,7 @@ async function postNotice() {
   document.getElementById('noticePublishAt').value = '';
   document.getElementById('noticeTargetAll').checked = true;
   document.querySelectorAll('.notice-target-store').forEach(cb => cb.checked = true);
+  applyNoticeTargetRestriction();
   const isScheduled = notice.publishAt && new Date(notice.publishAt) > new Date();
   msg.style.color = '#27ae60';
   msg.textContent = isScheduled
@@ -1907,7 +1924,11 @@ function stylistStoreSelect(name, currentStoreVal) {
 function renderStylistManage() {
   const list = document.getElementById('stylistList');
   if (!list) return;
-  const allStores = Object.entries(STORE_MEMBERS);
+  // FCオーナーは自店舗のみ表示
+  const visibleStores = isFCOwner()
+    ? Object.entries(STORE_MEMBERS).filter(([k]) => k === currentStore)
+    : Object.entries(STORE_MEMBERS);
+  const allStores = visibleStores;
   let html = '';
   allStores.forEach(([storeKey, members]) => {
     if (members.length === 0 && storeKey !== 'shibuya') return;
@@ -1927,8 +1948,8 @@ function renderStylistManage() {
     });
     html += '</div>';
   });
-  // カスタムでstoreが未指定のもの
-  const unassigned = customStylists.filter(s => !s.store);
+  // カスタムでstoreが未指定のもの（FCオーナーには非表示）
+  const unassigned = isFCOwner() ? [] : customStylists.filter(s => !s.store);
   if (unassigned.length > 0) {
     html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:#e67e22;margin-bottom:8px">未割り当て</div>`;
     unassigned.forEach(s => {
@@ -1965,11 +1986,13 @@ function doLogin() {
   }
   currentUser = name;
   currentStore = store;
+  currentRole = store === 'honsha' ? 'honsha' : isManagerRole(name, store) ? 'fc_owner' : 'stylist';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('headerUserName').textContent = STORE_LABELS[store] + ' | ' + name;
+  const roleLabel = currentRole === 'honsha' ? '本社' : currentRole === 'fc_owner' ? `${STORE_LABELS[store]} (FCオーナー)` : STORE_LABELS[store];
+  document.getElementById('headerUserName').textContent = roleLabel + ' | ' + name;
   document.getElementById('profileName').value = name;
-  document.getElementById('profileRole').value = store === 'honsha' ? '本社' : 'スタイリスト';
+  document.getElementById('profileRole').value = currentRole === 'honsha' ? '本社' : currentRole === 'fc_owner' ? 'FCオーナー' : 'スタイリスト';
   // シフト月初期化（提出期限が切れていない最初の月をデフォルトに）
   const _t = new Date();
   let _ry = _t.getFullYear(), _rm = _t.getMonth() + 1;
@@ -2092,7 +2115,14 @@ function showSection(name) {
   if (name === 'shift-request') renderShiftRequest();
   else if (name === 'shift-manage') { updateManageStoreTabs(); renderShiftManage(); }
   else if (name === 'shift-view') renderShiftView();
-  else if (name === 'stylist-manage') renderStylistManage();
+  else if (name === 'stylist-manage') {
+    // FCオーナーは追加フォームの配属店舗を自店舗に固定
+    if (isFCOwner()) {
+      const sel = document.getElementById('newStylistStore');
+      if (sel) { sel.value = currentStore; sel.disabled = true; }
+    }
+    renderStylistManage();
+  }
   else if (name === 'notice') { renderNoticeList(); }
   else if (name === 'documents') { loadDocuments().then(() => renderDocuments()); }
   else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
