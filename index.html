@@ -1383,24 +1383,43 @@ async function removeStylist(name) {
 // マニュアル資料
 // ========================================
 let docMeta = { categories: [], files: [] };
+const DOCS_LOCAL_KEY = '__documents_local_backup';
 
 async function loadDocuments() {
-  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__documents').maybeSingle();
+  const cached = localStorage.getItem(DOCS_LOCAL_KEY);
+  const cachedData = cached ? JSON.parse(cached) : null;
+  const { data, error } = await sb.from('sales_data').select('data_json').eq('store_key', '__documents').maybeSingle();
+  if (error) {
+    if (cachedData) docMeta = cachedData;
+    return;
+  }
   if (data && data.data_json) {
     docMeta = data.data_json;
     if (!Array.isArray(docMeta.categories)) docMeta.categories = [];
     if (!Array.isArray(docMeta.files)) docMeta.files = [];
+  } else if (cachedData) {
+    docMeta = cachedData;
+    await saveDocuments(true);
+    return;
+  } else {
+    docMeta = { categories: [], files: [] };
   }
+  localStorage.setItem(DOCS_LOCAL_KEY, JSON.stringify(docMeta));
 }
 
-async function saveDocuments() {
-  await sb.from('sales_data').upsert({
+async function saveDocuments(silent = false) {
+  localStorage.setItem(DOCS_LOCAL_KEY, JSON.stringify(docMeta));
+  const { error } = await sb.from('sales_data').upsert({
     store_key: '__documents',
     filename: 'documents.json',
     data_json: docMeta,
     uploaded_at: new Date().toISOString(),
     uploaded_by: currentUser || ''
   }, { onConflict: 'store_key' });
+  if (error && !silent) {
+    console.error('saveDocuments failed:', error);
+    alert('資料情報の保存に失敗しました（通信エラー）。\nこの端末に一時保存されています。');
+  }
 }
 
 function renderDocuments() {
