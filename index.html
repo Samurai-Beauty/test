@@ -1189,6 +1189,16 @@ const SHIFT_LONG = {
   'early': '13:00-18:00',  'late':   '16:00-22:00',
   'full':  '13:00-22:00',  'off':    '休み',         'omakase': 'お任せ'
 };
+function shiftShort(key) {
+  if (!key) return '';
+  if (key.startsWith('custom:')) return key.slice(7).replace(/:00/g, '');
+  return SHIFT_SHORT[key] || key;
+}
+function shiftLong(key) {
+  if (!key) return '';
+  if (key.startsWith('custom:')) return key.slice(7);
+  return SHIFT_LONG[key] || key;
+}
 
 // シフト月状態
 let shiftReqMonth    = { y: 0, m: 0 };
@@ -1596,9 +1606,8 @@ function renderTodayStaff() {
       html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
       staffForStore.forEach(name => {
         const reqKey = dayTimes[name] || (allReqs[name] || {})[String(d)] || '';
-        const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
         const c = reqKey ? getShiftColor(reqKey) : { bg: '#95a5a6', text: '#fff' };
-        const timeText = opt ? opt.label : '時間未設定';
+        const timeText = reqKey ? shiftLong(reqKey) : '時間未設定';
         html += `<div style="background:${c.bg};color:${c.text};border-radius:8px;padding:6px 12px;font-size:13px;border-left:3px solid ${sc}">`;
         html += `<div style="font-weight:700">${name}</div>`;
         html += `<div style="font-size:11px;opacity:0.9">${timeText}</div></div>`;
@@ -2570,6 +2579,7 @@ function shiftKey(prefix, y, m) {
 
 // シフト種別カラー
 function getShiftColor(key) {
+  if (key && key.startsWith('custom:')) return { bg: '#8e44ad', text: '#fff' };
   switch (key) {
     case 'h11-17': case 'early': return { bg: '#e67e22', text: '#fff' };
     case 'late':                 return { bg: '#2980b9', text: '#fff' };
@@ -2893,8 +2903,9 @@ function makeStaffChip(day, name, dayTimes, allReqs, extraStyle) {
   const reqKey = dayTimes[name] || (allReqs[name] || {})[String(day)];
   const opt = SHIFT_OPTIONS.find(o => o.key === reqKey);
   const c = reqKey ? getShiftColor(reqKey) : { bg: '#95a5a6', text: '#fff' };
-  const timeLabel = opt
-    ? `<span style="font-size:8px;opacity:0.9;display:block">${opt.label}</span>`
+  const timeLabelTxt = reqKey ? shiftLong(reqKey) : null;
+  const timeLabel = timeLabelTxt
+    ? `<span style="font-size:8px;opacity:0.9;display:block">${timeLabelTxt}</span>`
     : `<span style="font-size:8px;display:block;opacity:0.8">⚠ 時間未設定</span>`;
   return `<span class="staff-tag" onclick="removeSchedStaff(${day},'${name}')" style="background:${c.bg};color:${c.text};padding:3px 6px;line-height:1.3;${extraStyle}">${name} ×${timeLabel}</span>`;
 }
@@ -3119,19 +3130,24 @@ function openModal(day) {
     const homeStore    = getHomeStore(name);
     const currentStore = dayStores[name] || homeStore || '';
     const hint = reqKey === 'off' ? ' 🔴' : reqKey ? ' 🟢' : '';
+    const isCustomTime = currentTime && currentTime.startsWith('custom:');
+    const customTimeVal = isCustomTime ? currentTime.slice(7) : '';
     let timeOptHtml = '<option value="">時間未設定</option>';
     timeOpts.forEach(o => {
       timeOptHtml += `<option value="${o.key}" ${currentTime === o.key ? 'selected' : ''}>${o.label}${o.sub ? '（' + o.sub + '）' : ''}</option>`;
     });
+    timeOptHtml += `<option value="custom" ${isCustomTime ? 'selected' : ''}>✏️ 任意時間を入力...</option>`;
     let storeOptHtml = '';
     storeOpts.forEach(s => {
       storeOptHtml += `<option value="${s}" ${currentStore === s ? 'selected' : ''}>${STORE_LABELS[s]}</option>`;
     });
     const disp = sel ? 'flex' : 'none';
+    const customDisp = (sel && isCustomTime) ? 'inline-block' : 'none';
     html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">`;
     html += `<button class="modal-staff-btn ${sel ? 'selected' : ''}" data-name="${name}" style="flex:1;min-width:90px;text-align:left" onclick="toggleModalStaff(this)">${name}${hint}</button>`;
-    html += `<div class="modal-staff-extras" data-name="${name}" style="display:${disp};gap:6px;align-items:center">`;
-    html += `<select class="modal-shift-sel" data-name="${name}" style="font-size:11px;padding:4px 3px;border:1.5px solid #ddd;border-radius:6px;min-width:110px">${timeOptHtml}</select>`;
+    html += `<div class="modal-staff-extras" data-name="${name}" style="display:${disp};gap:6px;align-items:center;flex-wrap:wrap">`;
+    html += `<select class="modal-shift-sel" data-name="${name}" onchange="toggleCustomTimeInput(this)" style="font-size:11px;padding:4px 3px;border:1.5px solid #ddd;border-radius:6px;min-width:110px">${timeOptHtml}</select>`;
+    html += `<input class="modal-custom-time" data-name="${name}" type="text" placeholder="例：11:00-14:00" value="${customTimeVal}" style="display:${customDisp};font-size:11px;padding:4px 6px;border:1.5px solid #8e44ad;border-radius:6px;width:88px">`;
     html += `<select class="modal-store-sel" data-name="${name}" style="font-size:11px;padding:4px 3px;border:1.5px solid ${STORE_COLORS[currentStore]||'#ddd'};border-radius:6px;min-width:90px;color:${STORE_COLORS[currentStore]||'#333'};font-weight:700" onchange="updateStoreSelColor(this)">${storeOptHtml}</select>`;
     html += '</div></div>';
   });
@@ -3143,6 +3159,12 @@ function updateStoreSelColor(sel) {
   const c = STORE_COLORS[sel.value] || '#ddd';
   sel.style.borderColor = c;
   sel.style.color = c;
+}
+
+function toggleCustomTimeInput(sel) {
+  const name = sel.dataset.name;
+  const input = document.querySelector(`#modalStaffList .modal-custom-time[data-name="${CSS.escape(name)}"]`);
+  if (input) input.style.display = sel.value === 'custom' ? 'inline-block' : 'none';
 }
 
 function toggleModalStaff(btn) {
@@ -3164,7 +3186,12 @@ function confirmStaffModal() {
   // シフト時間・出勤店舗を保存
   const newDayTimes = {}, newDayStores = {};
   document.querySelectorAll('#modalStaffList .modal-shift-sel').forEach(sel => {
-    if (selected.includes(sel.dataset.name) && sel.value) newDayTimes[sel.dataset.name] = sel.value;
+    let val = sel.value;
+    if (val === 'custom') {
+      const inp = document.querySelector(`#modalStaffList .modal-custom-time[data-name="${CSS.escape(sel.dataset.name)}"]`);
+      val = (inp && inp.value.trim()) ? 'custom:' + inp.value.trim() : '';
+    }
+    if (selected.includes(sel.dataset.name) && val) newDayTimes[sel.dataset.name] = val;
   });
   document.querySelectorAll('#modalStaffList .modal-store-sel').forEach(sel => {
     if (selected.includes(sel.dataset.name) && sel.value) newDayStores[sel.dataset.name] = sel.value;
@@ -3253,7 +3280,7 @@ function renderShiftView() {
       staffList.forEach(name => {
         const me = name === currentUser;
         const reqKey = dayTimesV[name] || (allReqsView[name] || {})[String(day)];
-        const timeShort = reqKey ? (SHIFT_SHORT[reqKey] || '') : '';
+        const timeShort = reqKey ? shiftShort(reqKey) : '';
         const shortName = name.slice(0, 2);
         if (me) {
           html += `<span class="view-staff-chip me"><span class="chip-name">${shortName}</span>${timeShort ? `<span class="chip-time">${timeShort}</span>` : ''}</span>`;
@@ -3288,7 +3315,7 @@ function showViewDayDetail(y, m, day) {
   } else {
     staffList.forEach(name => {
       const reqKey = dayTimesV[name] || (allReqsV[name] || {})[String(day)];
-      const timeLabel = reqKey ? (SHIFT_LONG[reqKey] || reqKey) : '—';
+      const timeLabel = reqKey ? shiftLong(reqKey) : '—';
       const c = reqKey ? getShiftColor(reqKey) : { bg: '#1a1a2e', text: '#fff' };
       const isMe = name === currentUser;
       html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0">
