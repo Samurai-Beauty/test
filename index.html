@@ -1519,21 +1519,48 @@ async function changeStylistStore(name, newStore) {
 // お知らせ
 // ========================================
 let notices = []; // { id, title, content, date, author, pinned }
+const NOTICES_LOCAL_KEY = '__notices_local_backup';
 
 async function loadNotices() {
+  // まずlocalStorageキャッシュを読む（Supabase失敗時のフォールバック用）
+  const cached = localStorage.getItem(NOTICES_LOCAL_KEY);
+  const cachedData = cached ? JSON.parse(cached) : null;
+
   const { data, error } = await sb.from('sales_data').select('data_json').eq('store_key', '__notices').maybeSingle();
-  if (error) { console.error('loadNotices error:', error); return; } // 通信失敗時は既存データを保持
-  notices = (data && Array.isArray(data.data_json)) ? data.data_json : [];
+  if (error) {
+    console.warn('loadNotices: Supabase error, using local cache:', error);
+    // Supabase失敗 → キャッシュがあれば使う、なければ現在の値を保持
+    if (cachedData) notices = cachedData;
+    return;
+  }
+  if (data && Array.isArray(data.data_json)) {
+    notices = data.data_json;
+  } else if (cachedData) {
+    // Supabaseに未保存だがローカルキャッシュがある場合は復元して保存
+    notices = cachedData;
+    await saveNotices();
+    return;
+  } else {
+    notices = [];
+  }
+  // 正常取得できたらキャッシュも更新
+  localStorage.setItem(NOTICES_LOCAL_KEY, JSON.stringify(notices));
 }
 
 async function saveNotices() {
-  await sb.from('sales_data').upsert({
+  // localStorageに先に保存（Supabase失敗でもデータを守る）
+  localStorage.setItem(NOTICES_LOCAL_KEY, JSON.stringify(notices));
+  const { error } = await sb.from('sales_data').upsert({
     store_key: '__notices',
     filename: 'notices.json',
     data_json: notices,
     uploaded_at: new Date().toISOString(),
     uploaded_by: currentUser || ''
   }, { onConflict: 'store_key' });
+  if (error) {
+    console.error('saveNotices: Supabase save failed:', error);
+    alert('お知らせの保存に失敗しました（通信エラー）。\n内容はこの端末に一時保存されています。\nWi-Fi等を確認して再度お試しください。');
+  }
 }
 
 function switchNoticeTab(tab) {
