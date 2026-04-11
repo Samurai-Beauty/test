@@ -1214,6 +1214,11 @@ let shiftReqMonth    = { y: 0, m: 0 };
 let shiftManageMonth = { y: 0, m: 0 };
 let shiftViewMonth   = { y: 0, m: 0 };
 let shiftViewStores = ['nishishinjuku', 'sanchome', 'shibuya']; // 複数選択可（本社）
+function getAllowedViewStores() {
+  if (currentStore === 'honsha') return ['nishishinjuku', 'sanchome', 'shibuya'];
+  if (currentStore === 'shibuya') return ['shibuya'];
+  return ['nishishinjuku', 'sanchome']; // 新宿エリア
+}
 let shiftManageTab   = 'requests';
 let shiftManageStore = ['nishishinjuku'];
 let modalDay         = null;
@@ -2003,6 +2008,7 @@ function doLogin() {
   shiftReqMonth = { y: _ry, m: _rm };
   shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
+  shiftViewStores  = getAllowedViewStores();
   const isHonsha = store === 'honsha';
   const isMgr = isHonsha || isManagerRole(name, store);
   // シフト管理・スタイリスト管理は本社＋店舗管理者に表示
@@ -3434,8 +3440,12 @@ function renderShiftView() {
   notice.style.display = 'none';
   card.style.display = 'block';
 
-  // 全ユーザーにタブを表示（スタイリストも店舗切り替え可能）
-  document.getElementById('shiftViewStoreTabs').style.display = 'flex';
+  // 許可された店舗のタブのみ表示（新宿エリア→2店舗、渋谷東→タブ非表示）
+  const allowedStores = getAllowedViewStores();
+  document.querySelectorAll('#shiftViewStoreTabs .sview-tab').forEach(btn => {
+    btn.style.display = allowedStores.includes(btn.dataset.store) ? '' : 'none';
+  });
+  document.getElementById('shiftViewStoreTabs').style.display = allowedStores.length > 1 ? 'flex' : 'none';
 
   const sched = getSched(y, m);
   const allReqsView = getAllReqs(y, m);
@@ -3532,6 +3542,7 @@ function closeViewDayDetail() {
 }
 
 function toggleShiftViewStore(store) {
+  if (!getAllowedViewStores().includes(store)) return; // 権限外の店舗は切り替え不可
   const idx = shiftViewStores.indexOf(store);
   if (idx === -1) {
     shiftViewStores.push(store);
