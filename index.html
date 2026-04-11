@@ -1312,21 +1312,43 @@ function updateLoginMembers(storeKey) {
 }
 
 // スタイリスト管理（Supabaseに保存）
+const STYLISTS_LOCAL_KEY = '__stylists_local_backup';
+
 async function loadCustomStylists() {
-  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__stylists').maybeSingle();
+  const cached = localStorage.getItem(STYLISTS_LOCAL_KEY);
+  const cachedData = cached ? JSON.parse(cached) : null;
+
+  const { data, error } = await sb.from('sales_data').select('data_json').eq('store_key', '__stylists').maybeSingle();
+  if (error) {
+    console.warn('loadCustomStylists: Supabase error, using local cache:', error);
+    if (cachedData) customStylists = cachedData;
+    return;
+  }
   if (data && data.data_json) {
     customStylists = Array.isArray(data.data_json) ? data.data_json : [];
+  } else if (cachedData) {
+    customStylists = cachedData;
+    await saveCustomStylists();
+    return;
+  } else {
+    customStylists = [];
   }
+  localStorage.setItem(STYLISTS_LOCAL_KEY, JSON.stringify(customStylists));
 }
 
 async function saveCustomStylists() {
-  await sb.from('sales_data').upsert({
+  localStorage.setItem(STYLISTS_LOCAL_KEY, JSON.stringify(customStylists));
+  const { error } = await sb.from('sales_data').upsert({
     store_key: '__stylists',
     filename: 'stylists.json',
     data_json: customStylists,
     uploaded_at: new Date().toISOString(),
     uploaded_by: currentUser || ''
   }, { onConflict: 'store_key' });
+  if (error) {
+    console.error('saveCustomStylists: Supabase save failed:', error);
+    alert('スタイリストの保存に失敗しました（通信エラー）。\nこの端末に一時保存されています。\nWi-Fi等を確認して再度お試しください。');
+  }
 }
 
 async function addStylist() {
@@ -1336,6 +1358,7 @@ async function addStylist() {
   const msg   = document.getElementById('stylistAddMsg');
   msg.style.display = 'block';
   if (!name || !pass) { msg.style.color = '#e74c3c'; msg.textContent = '名前とパスワードを入力してください'; return; }
+  await loadCustomStylists(); // 追加前に最新データを取得（上書き防止）
   if (getAllMembers().includes(name)) { msg.style.color = '#e74c3c'; msg.textContent = '同じ名前のスタイリストがすでに存在します'; return; }
   const entry = { name, password: pass };
   if (store) entry.store = store;
@@ -1351,6 +1374,7 @@ async function addStylist() {
 
 async function removeStylist(name) {
   if (!confirm(`「${name}」を削除しますか？`)) return;
+  await loadCustomStylists(); // 削除前に最新データを取得
   customStylists = customStylists.filter(s => s.name !== name);
   await saveCustomStylists();
   renderStylistManage();
@@ -1514,6 +1538,7 @@ async function deleteDocument(id) {
 }
 
 async function changeStylistStore(name, newStore) {
+  await loadCustomStylists(); // 変更前に最新データを取得
   const idx = customStylists.findIndex(s => s.name === name);
   if (idx === -1) return;
   if (newStore) {
