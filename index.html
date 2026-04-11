@@ -1327,7 +1327,7 @@ async function loadCustomStylists() {
     customStylists = Array.isArray(data.data_json) ? data.data_json : [];
   } else if (cachedData) {
     customStylists = cachedData;
-    await saveCustomStylists();
+    await saveCustomStylists(true); // ページ起動時の自動同期はエラー表示しない
     return;
   } else {
     customStylists = [];
@@ -1335,7 +1335,7 @@ async function loadCustomStylists() {
   localStorage.setItem(STYLISTS_LOCAL_KEY, JSON.stringify(customStylists));
 }
 
-async function saveCustomStylists() {
+async function saveCustomStylists(silent = false) {
   localStorage.setItem(STYLISTS_LOCAL_KEY, JSON.stringify(customStylists));
   const { error } = await sb.from('sales_data').upsert({
     store_key: '__stylists',
@@ -1346,7 +1346,7 @@ async function saveCustomStylists() {
   }, { onConflict: 'store_key' });
   if (error) {
     console.error('saveCustomStylists: Supabase save failed:', error);
-    alert('スタイリストの保存に失敗しました（通信エラー）。\nこの端末に一時保存されています。\nWi-Fi等を確認して再度お試しください。');
+    if (!silent) alert('スタイリストの保存に失敗しました（通信エラー）。\nこの端末に一時保存されています。\nWi-Fi等を確認して再度お試しください。');
   }
 }
 
@@ -1573,7 +1573,7 @@ async function loadNotices() {
   } else if (cachedData) {
     // Supabaseに未保存だがローカルキャッシュがある場合は復元して保存
     notices = cachedData;
-    await saveNotices();
+    await saveNotices(true); // ページ起動時の自動同期はエラー表示しない
     return;
   } else {
     notices = [];
@@ -1582,7 +1582,7 @@ async function loadNotices() {
   localStorage.setItem(NOTICES_LOCAL_KEY, JSON.stringify(notices));
 }
 
-async function saveNotices() {
+async function saveNotices(silent = false) {
   // localStorageに先に保存（Supabase失敗でもデータを守る）
   localStorage.setItem(NOTICES_LOCAL_KEY, JSON.stringify(notices));
   const { error } = await sb.from('sales_data').upsert({
@@ -1594,7 +1594,7 @@ async function saveNotices() {
   }, { onConflict: 'store_key' });
   if (error) {
     console.error('saveNotices: Supabase save failed:', error);
-    alert('お知らせの保存に失敗しました（通信エラー）。\n内容はこの端末に一時保存されています。\nWi-Fi等を確認して再度お試しください。');
+    if (!silent) alert('お知らせの保存に失敗しました（通信エラー）。\n内容はこの端末に一時保存されています。\nWi-Fi等を確認して再度お試しください。');
   }
 }
 
