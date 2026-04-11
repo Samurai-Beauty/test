@@ -694,9 +694,9 @@
               <button onclick="shiftReqNext()">&#8250;</button>
             </div>
             <span class="submit-badge pending" id="shiftReqBadge">未提出</span>
-            <span style="font-size:11px;color:#e74c3c;font-weight:600">※提出は前々月末日まで</span>
+            <span id="shiftReqDeadlineLabel" style="font-size:11px;font-weight:600"></span>
           </div>
-          <button class="btn-primary" onclick="submitShiftRequest()">提出する</button>
+          <button class="btn-primary" id="shiftReqSubmitBtn" onclick="submitShiftRequest()">提出する</button>
         </div>
 
         <div class="card" style="padding:14px 20px;margin-bottom:16px">
@@ -1854,9 +1854,14 @@ function doLogin() {
   document.getElementById('headerUserName').textContent = STORE_LABELS[store] + ' | ' + name;
   document.getElementById('profileName').value = name;
   document.getElementById('profileRole').value = store === 'honsha' ? '本社' : 'スタイリスト';
-  // シフト月初期化
+  // シフト月初期化（提出期限が切れていない最初の月をデフォルトに）
   const _t = new Date();
-  shiftReqMonth    = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
+  let _ry = _t.getFullYear(), _rm = _t.getMonth() + 1;
+  for (let i = 0; i < 12; i++) {
+    if (!isShiftDeadlinePassed(_ry, _rm)) break;
+    _rm++; if (_rm > 12) { _rm = 1; _ry++; }
+  }
+  shiftReqMonth = { y: _ry, m: _rm };
   shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   const isHonsha = store === 'honsha';
@@ -2604,6 +2609,23 @@ function getShiftHours(key) {
     default:       return 0;
   }
 }
+// ========================================
+// シフト希望 提出期限（前々月末日 23:59）
+// ========================================
+function getShiftDeadline(y, m) {
+  // 対象月 (y,m) の前々月の末日 23:59:59
+  let dm = m - 2, dy = y;
+  if (dm <= 0) { dm += 12; dy -= 1; }
+  // new Date(dy, dm, 0) = dmの末日（0=前月最終日）
+  return new Date(dy, dm, 0, 23, 59, 59, 999);
+}
+function isShiftDeadlinePassed(y, m) {
+  return new Date() > getShiftDeadline(y, m);
+}
+function fmtDeadline(y, m) {
+  const d = getShiftDeadline(y, m);
+  return `${d.getMonth() + 1}月${d.getDate()}日 23:59`;
+}
 function getAllReqs(y, m) {
   const raw = localStorage.getItem(shiftKey('sreq', y, m));
   return raw ? JSON.parse(raw) : {};
@@ -2699,9 +2721,24 @@ function renderShiftRequest() {
   const { y, m } = shiftReqMonth;
   document.getElementById('shiftReqLabel').textContent = fmtMonth(y, m);
   const submitted = isSubmitted(y, m, currentUser);
+  const locked = isShiftDeadlinePassed(y, m);
   const badge = document.getElementById('shiftReqBadge');
   badge.textContent = submitted ? '提出済み' : '未提出';
   badge.className = 'submit-badge ' + (submitted ? 'done' : 'pending');
+  // 期限ラベル
+  const dlLabel = document.getElementById('shiftReqDeadlineLabel');
+  if (locked) {
+    dlLabel.textContent = '提出期限切れ（' + fmtDeadline(y, m) + ' まで）';
+    dlLabel.style.color = '#e74c3c';
+  } else {
+    dlLabel.textContent = '提出期限：' + fmtDeadline(y, m) + ' まで';
+    dlLabel.style.color = '#27ae60';
+  }
+  // 提出ボタン制御
+  const btn = document.getElementById('shiftReqSubmitBtn');
+  btn.disabled = locked;
+  btn.style.opacity = locked ? '0.4' : '1';
+  btn.style.cursor  = locked ? 'not-allowed' : 'pointer';
 
   const req = getMyReq(y, m);
   // サマリー
@@ -2743,7 +2780,7 @@ function renderShiftRequest() {
     } else {
       badgeHtml = `<span class="state-badge">未回答</span>`;
     }
-    const click = past ? '' : `onclick="openShiftPicker(${day})"`;
+    const click = (past || locked) ? '' : `onclick="openShiftPicker(${day})"`;
     const cellStyle = col && state !== 'off' ? `style="background:${col.bg}22;border-color:${col.bg}"` : '';
     html += `<div class="${cls}" ${cellStyle} ${click}>`;
     html += `<div class="day-num">${day}${holiday ? '<span style="font-size:8px;color:#e74c3c;margin-left:2px">祝</span>' : ''}</div>`;
@@ -2757,6 +2794,7 @@ let shiftPickerDay = null;
 
 function openShiftPicker(day) {
   const { y, m } = shiftReqMonth;
+  if (isShiftDeadlinePassed(y, m)) return; // 期限切れは操作不可
   const req = getMyReq(y, m);
   const cur = req[String(day)] || '';
   shiftPickerDay = day;
@@ -2811,6 +2849,10 @@ function shiftReqNext() {
 
 function submitShiftRequest() {
   const { y, m } = shiftReqMonth;
+  if (isShiftDeadlinePassed(y, m)) {
+    alert('提出期限（' + fmtDeadline(y, m) + '）を過ぎているため提出できません。');
+    return;
+  }
   if (isSubmitted(y, m, currentUser)) {
     if (!confirm('すでに提出済みです。内容を更新しますか？')) return;
   }
