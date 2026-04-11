@@ -1496,8 +1496,9 @@ async function uploadDocument() {
   msg.style.color = '#666';
   msg.textContent = 'アップロード中...';
   const timestamp = Date.now();
-  const safeName = file.name.replace(/[^\w\u3040-\u9fff\u30a0-\u30ff\uff00-\uffef.\-]/g, '_');
-  const path = `${category}/${timestamp}_${safeName}`;
+  const safeName = file.name.replace(/[^\w.\-]/g, '_');
+  const safeCategory = category.replace(/[^\w\-]/g, '_') || 'misc';
+  const path = `${safeCategory}/${timestamp}_${safeName}`;
   const { error } = await sb.storage.from('documents').upload(path, file, { upsert: false });
   if (error) {
     btn.disabled = false;
