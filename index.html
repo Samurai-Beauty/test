@@ -464,6 +464,9 @@
       <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
         <span class="icon">👥</span><span>スタイリスト管理</span>
       </div>
+      <div class="nav-item" onclick="showSection('documents')" id="nav-documents">
+        <span class="icon">📁</span><span>マニュアル資料</span>
+      </div>
       <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
         <span class="icon">💬</span><span>ご意見箱</span>
       </div>
@@ -893,6 +896,47 @@
         </div>
       </div>
 
+      <!-- ====== マニュアル資料 ====== -->
+      <div class="section" id="section-documents">
+        <div class="section-title">📁 マニュアル資料</div>
+
+        <!-- 本社のみ: カテゴリ管理 + アップロード -->
+        <div id="docManageArea" style="display:none">
+          <div class="card">
+            <div class="card-title">📂 カテゴリ管理</div>
+            <div id="docCategoryList"></div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <input type="text" id="newCategoryName" placeholder="新しいカテゴリ名（例：接客マニュアル）" style="flex:1;padding:8px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+              <button class="btn-primary" onclick="addDocCategory()" style="white-space:nowrap">追加</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">⬆️ ファイルをアップロード</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+              <div>
+                <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">カテゴリ</label>
+                <select id="docUploadCategory" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;background:white">
+                  <option value="">選択してください</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">ファイル（PDF・画像）</label>
+                <input type="file" id="docFileInput" accept=".pdf,image/*" style="width:100%;padding:7px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+              </div>
+            </div>
+            <button class="btn-primary" onclick="uploadDocument()" id="docUploadBtn" style="width:100%">アップロード</button>
+            <div id="docUploadMsg" style="font-size:13px;margin-top:8px;display:none"></div>
+          </div>
+        </div>
+
+        <!-- 全員: 資料一覧 -->
+        <div class="card">
+          <div class="card-title">📋 資料一覧</div>
+          <div id="docList"><div style="color:#aaa;font-size:13px;text-align:center;padding:20px">読み込み中...</div></div>
+        </div>
+      </div>
+
       <!-- ====== プロフィール ====== -->
       <!-- ====== ご意見箱 ====== -->
       <div class="section" id="section-suggestions">
@@ -1290,6 +1334,163 @@ async function removeStylist(name) {
   customStylists = customStylists.filter(s => s.name !== name);
   await saveCustomStylists();
   renderStylistManage();
+}
+
+// ========================================
+// マニュアル資料
+// ========================================
+let docMeta = { categories: [], files: [] };
+
+async function loadDocuments() {
+  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__documents').maybeSingle();
+  if (data && data.data_json) {
+    docMeta = data.data_json;
+    if (!Array.isArray(docMeta.categories)) docMeta.categories = [];
+    if (!Array.isArray(docMeta.files)) docMeta.files = [];
+  }
+}
+
+async function saveDocuments() {
+  await sb.from('sales_data').upsert({
+    store_key: '__documents',
+    filename: 'documents.json',
+    data_json: docMeta,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || ''
+  }, { onConflict: 'store_key' });
+}
+
+function renderDocuments() {
+  const isHonsha = currentStore === 'honsha';
+  document.getElementById('docManageArea').style.display = isHonsha ? 'block' : 'none';
+
+  if (isHonsha) {
+    // カテゴリセレクト更新
+    const sel = document.getElementById('docUploadCategory');
+    sel.innerHTML = '<option value="">選択してください</option>' +
+      docMeta.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    // カテゴリ一覧
+    const catList = document.getElementById('docCategoryList');
+    catList.innerHTML = docMeta.categories.length === 0
+      ? '<div style="color:#aaa;font-size:13px">カテゴリがありません</div>'
+      : docMeta.categories.map(c => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;background:#f8f9fa;margin-bottom:4px">
+            <span style="font-size:14px">📂 ${c}</span>
+            <button onclick="removeDocCategory('${c.replace(/'/g,"\\'")}') " style="padding:2px 8px;border-radius:5px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>
+          </div>`).join('');
+  }
+
+  // ファイル一覧（カテゴリ別）
+  const list = document.getElementById('docList');
+  if (docMeta.files.length === 0) {
+    list.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:20px">資料がありません</div>';
+    return;
+  }
+  const grouped = {};
+  docMeta.files.forEach(f => {
+    if (!grouped[f.category]) grouped[f.category] = [];
+    grouped[f.category].push(f);
+  });
+  let html = '';
+  Object.entries(grouped).forEach(([cat, files]) => {
+    html += `<div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:#0f3460;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e8ecf0">📂 ${cat}</div>`;
+    files.forEach(f => {
+      const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      const icon = isPdf ? '📄' : '🖼️';
+      const sizeStr = f.size ? (f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB') : '';
+      const dateStr = f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString('ja-JP') : '';
+      const meta = [sizeStr, dateStr].filter(Boolean).join(' ・ ');
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${icon} ${f.name}</div>
+          ${meta ? `<div style="font-size:11px;color:#888;margin-top:2px">${meta}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;margin-left:10px;flex-shrink:0">
+          <a href="${f.url}" target="_blank" rel="noopener" style="padding:5px 12px;border-radius:6px;border:1.5px solid #0f3460;color:#0f3460;background:white;cursor:pointer;font-size:12px;text-decoration:none;white-space:nowrap">開く</a>
+          ${isHonsha ? `<button onclick="deleteDocument('${f.id}')" style="padding:5px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : ''}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  list.innerHTML = html;
+}
+
+async function addDocCategory() {
+  const input = document.getElementById('newCategoryName');
+  const name = input.value.trim();
+  if (!name) return;
+  if (docMeta.categories.includes(name)) { alert('同じカテゴリが既に存在します'); return; }
+  docMeta.categories.push(name);
+  await saveDocuments();
+  input.value = '';
+  renderDocuments();
+}
+
+async function removeDocCategory(cat) {
+  if (docMeta.files.some(f => f.category === cat)) {
+    alert(`「${cat}」にファイルがあるため削除できません。\n先にファイルを削除してください。`);
+    return;
+  }
+  if (!confirm(`カテゴリ「${cat}」を削除しますか？`)) return;
+  docMeta.categories = docMeta.categories.filter(c => c !== cat);
+  await saveDocuments();
+  renderDocuments();
+}
+
+async function uploadDocument() {
+  const category = document.getElementById('docUploadCategory').value;
+  const fileInput = document.getElementById('docFileInput');
+  const msg = document.getElementById('docUploadMsg');
+  const btn = document.getElementById('docUploadBtn');
+  msg.style.display = 'block';
+  if (!category) { msg.style.color='#e74c3c'; msg.textContent='カテゴリを選択してください'; return; }
+  if (!fileInput.files[0]) { msg.style.color='#e74c3c'; msg.textContent='ファイルを選択してください'; return; }
+  const file = fileInput.files[0];
+  if (file.size > 20 * 1024 * 1024) { msg.style.color='#e74c3c'; msg.textContent='ファイルサイズは20MB以下にしてください'; return; }
+  btn.disabled = true;
+  msg.style.color = '#666';
+  msg.textContent = 'アップロード中...';
+  const timestamp = Date.now();
+  const safeName = file.name.replace(/[^\w\u3040-\u9fff\u30a0-\u30ff\uff00-\uffef.\-]/g, '_');
+  const path = `${category}/${timestamp}_${safeName}`;
+  const { error } = await sb.storage.from('documents').upload(path, file, { upsert: false });
+  if (error) {
+    btn.disabled = false;
+    msg.style.color = '#e74c3c';
+    msg.textContent = 'アップロード失敗: ' + error.message;
+    return;
+  }
+  const { data: urlData } = sb.storage.from('documents').getPublicUrl(path);
+  docMeta.files.push({
+    id: timestamp + '_' + Math.random().toString(36).slice(2, 7),
+    name: file.name,
+    category,
+    path,
+    url: urlData.publicUrl,
+    type: file.type,
+    size: file.size,
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: currentUser || ''
+  });
+  await saveDocuments();
+  btn.disabled = false;
+  msg.style.color = '#27ae60';
+  msg.textContent = `「${file.name}」をアップロードしました`;
+  fileInput.value = '';
+  renderDocuments();
+}
+
+async function deleteDocument(id) {
+  const idx = docMeta.files.findIndex(f => f.id === id);
+  if (idx === -1) return;
+  const f = docMeta.files[idx];
+  if (!confirm(`「${f.name}」を削除しますか？`)) return;
+  await sb.storage.from('documents').remove([f.path]);
+  docMeta.files.splice(idx, 1);
+  await saveDocuments();
+  renderDocuments();
 }
 
 async function changeStylistStore(name, newStore) {
@@ -1760,6 +1961,7 @@ function showSection(name) {
   else if (name === 'shift-view') renderShiftView();
   else if (name === 'stylist-manage') renderStylistManage();
   else if (name === 'notice') { renderNoticeList(); }
+  else if (name === 'documents') { loadDocuments().then(() => renderDocuments()); }
   else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
 }
 
