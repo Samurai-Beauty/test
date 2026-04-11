@@ -861,14 +861,25 @@
         <!-- 新規追加フォーム -->
         <div class="card">
           <div class="card-title">➕ スタイリストを追加</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-bottom:10px">
             <div>
               <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">名前</label>
-              <input type="text" id="newStylistName" placeholder="例：山本花子" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px">
+              <input type="text" id="newStylistName" placeholder="例：山本花子" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
             </div>
             <div>
+              <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">配属店舗</label>
+              <select id="newStylistStore" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;background:white">
+                <option value="">未設定</option>
+                <option value="nishishinjuku">西新宿本店</option>
+                <option value="sanchome">新宿三丁目</option>
+                <option value="shibuya">渋谷東</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+            <div>
               <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">初期パスワード</label>
-              <input type="text" id="newStylistPass" placeholder="例：Samurai.2023" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px">
+              <input type="text" id="newStylistPass" placeholder="例：Samurai.2023" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
             </div>
             <button class="btn-primary" onclick="addStylist()" style="height:38px;white-space:nowrap">追加</button>
           </div>
@@ -1255,24 +1266,40 @@ async function saveCustomStylists() {
 }
 
 async function addStylist() {
-  const name = document.getElementById('newStylistName').value.trim();
-  const pass = document.getElementById('newStylistPass').value.trim();
-  const msg  = document.getElementById('stylistAddMsg');
+  const name  = document.getElementById('newStylistName').value.trim();
+  const pass  = document.getElementById('newStylistPass').value.trim();
+  const store = document.getElementById('newStylistStore').value;
+  const msg   = document.getElementById('stylistAddMsg');
   msg.style.display = 'block';
   if (!name || !pass) { msg.style.color = '#e74c3c'; msg.textContent = '名前とパスワードを入力してください'; return; }
   if (getAllMembers().includes(name)) { msg.style.color = '#e74c3c'; msg.textContent = '同じ名前のスタイリストがすでに存在します'; return; }
-  customStylists.push({ name, password: pass });
+  const entry = { name, password: pass };
+  if (store) entry.store = store;
+  customStylists.push(entry);
   await saveCustomStylists();
   document.getElementById('newStylistName').value = '';
   document.getElementById('newStylistPass').value = '';
+  document.getElementById('newStylistStore').value = '';
   msg.style.color = '#27ae60';
-  msg.textContent = `「${name}」を追加しました`;
+  msg.textContent = `「${name}」を追加しました` + (store ? `（${STORE_LABELS[store]}）` : '（未割り当て）');
   renderStylistManage();
 }
 
 async function removeStylist(name) {
   if (!confirm(`「${name}」を削除しますか？`)) return;
   customStylists = customStylists.filter(s => s.name !== name);
+  await saveCustomStylists();
+  renderStylistManage();
+}
+
+async function changeStylistStore(name, newStore) {
+  const idx = customStylists.findIndex(s => s.name === name);
+  if (idx === -1) return;
+  if (newStore) {
+    customStylists[idx].store = newStore;
+  } else {
+    delete customStylists[idx].store;
+  }
   await saveCustomStylists();
   renderStylistManage();
 }
@@ -1538,6 +1565,16 @@ async function deleteNotice(id) {
   renderHomeNotice();
 }
 
+function stylistStoreSelect(name, currentStoreVal) {
+  const opts = [
+    ['', '未割り当て'],
+    ['nishishinjuku', '西新宿本店'],
+    ['sanchome', '新宿三丁目'],
+    ['shibuya', '渋谷東'],
+  ].map(([v, l]) => `<option value="${v}" ${currentStoreVal === v ? 'selected' : ''}>${l}</option>`).join('');
+  return `<select onchange="changeStylistStore('${name}',this.value)" style="padding:4px 6px;border:1.5px solid #ddd;border-radius:6px;font-size:12px;background:white;cursor:pointer">${opts}</select>`;
+}
+
 function renderStylistManage() {
   const list = document.getElementById('stylistList');
   if (!list) return;
@@ -1553,7 +1590,10 @@ function renderStylistManage() {
       const isCustom = customStylists.some(s => s.name === name);
       html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px">
         <span style="font-size:14px">${name}</span>
-        ${isCustom ? `<button onclick="removeStylist('${name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : '<span style="font-size:11px;color:#aaa">固定</span>'}
+        <div style="display:flex;align-items:center;gap:8px">
+          ${isCustom ? stylistStoreSelect(name, storeKey) : ''}
+          ${isCustom ? `<button onclick="removeStylist('${name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : '<span style="font-size:11px;color:#aaa">固定</span>'}
+        </div>
       </div>`;
     });
     html += '</div>';
@@ -1561,11 +1601,14 @@ function renderStylistManage() {
   // カスタムでstoreが未指定のもの
   const unassigned = customStylists.filter(s => !s.store);
   if (unassigned.length > 0) {
-    html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:#0f3460;margin-bottom:8px">未割り当て</div>`;
+    html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:#e67e22;margin-bottom:8px">未割り当て</div>`;
     unassigned.forEach(s => {
-      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px">
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#fff8f0;border:1px solid #f0d5b0;margin-bottom:6px">
         <span style="font-size:14px">${s.name}</span>
-        <button onclick="removeStylist('${s.name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${stylistStoreSelect(s.name, '')}
+          <button onclick="removeStylist('${s.name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>
+        </div>
       </div>`;
     });
     html += '</div>';
