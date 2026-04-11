@@ -29,7 +29,7 @@
   .doc-header .sub { font-size: 8pt; color: #666; text-align: right; line-height: 1.6; }
 
   /* ===== セクション ===== */
-  .section { margin-bottom: 11px; }
+  .section { margin-bottom: 10px; }
   .section-title {
     font-size: 10pt; font-weight: 800; color: white; background: #1a1a2e;
     padding: 3px 10px; border-radius: 4px; margin-bottom: 6px; display: inline-block;
@@ -74,16 +74,17 @@
   .badge-purple { background: #f3e8fd; color: #8e44ad; }
   .badge-orange { background: #fef3e8; color: #e67e22; }
   .badge-green { background: #e8f5e9; color: #27ae60; }
+  .badge-red { background: #fde8e8; color: #c0392b; }
 
   /* ===== 区切り ===== */
-  .divider { border: none; border-top: 1px dashed #ddd; margin: 8px 0; }
+  .divider { border: none; border-top: 1px dashed #ddd; margin: 7px 0; }
 
   /* ===== 注釈 ===== */
   .note {
     font-size: 8pt; color: #888; background: #f8f8f8; border-left: 3px solid #ddd;
     padding: 4px 8px; border-radius: 0 4px 4px 0; margin-top: 5px;
   }
-  .note strong { color: #555; }
+  .note.warn { border-color: #e74c3c; background: #fef6f6; color: #c0392b; }
 
   /* ===== フッター ===== */
   .doc-footer {
@@ -94,12 +95,8 @@
 
   /* ===== シフト凡例 ===== */
   .legend { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
-  .legend-item {
-    display: flex; align-items: center; gap: 4px; font-size: 8pt;
-  }
-  .legend-dot {
-    width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
-  }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 8pt; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -124,8 +121,8 @@
 <div class="page">
 
   <div class="doc-header">
-    <h1>✂ Samurai System &nbsp; 操作マニュアル</h1>
-    <div class="sub">スタイリスト向け<br>ver. 2026.04</div>
+    <h1>⚔️ Samurai System &nbsp; 操作マニュアル</h1>
+    <div class="sub">スタイリスト向け<br>ver. 2026.05</div>
   </div>
 
   <!-- ログイン -->
@@ -137,7 +134,8 @@
         <div class="step"><div class="step-num">1</div><div class="step-text">店舗をプルダウンで選択</div></div>
         <div class="step"><div class="step-num">2</div><div class="step-text">スタイリスト名を選択</div></div>
         <div class="step"><div class="step-num">3</div><div class="step-text">パスワードを入力して「ログイン」</div></div>
-        <div class="step"><div class="step-num">4</div><div class="step-text">「次回から自動入力」にチェックを入れると次回から省略できます</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">「次回から自動入力」にチェックで次回省略できます</div></div>
+        <div class="note">店舗・名前は自動的に前回の選択が記憶されます</div>
       </div>
       <div class="card">
         <h3>📱 ホーム画面への追加（推奨）</h3>
@@ -158,8 +156,10 @@
       <div class="card">
         <h3>📝 希望の入力方法</h3>
         <div class="step"><div class="step-num">1</div><div class="step-text">左メニューの「シフト希望」をタップ</div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-text">希望する日付をタップしてシフト時間を選択</div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-text">「シフト希望を提出」ボタンで送信</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">希望する月を確認（自動で提出可能な月が表示）</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">日付をタップしてシフト時間を選択</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">「シフト希望を提出」ボタンで送信</div></div>
+        <div class="note warn">⏰ 提出期限：提出対象月の<strong>前々月末日 23:59</strong>まで。期限後はロックされます</div>
         <div class="note">提出後の変更は要相談。リクエスト提出もしくは担当者へ連絡をお願いします。</div>
       </div>
       <div class="card">
@@ -173,6 +173,7 @@
           <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div><span>休日希望</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:#7f8c8d"></div><span>おまかせ</span></div>
         </div>
+        <div class="note">画面上部に提出期限日が<span style="color:#27ae60;font-weight:700">緑</span>（受付中）/<span style="color:#e74c3c;font-weight:700">赤</span>（期限切れ）で表示されます</div>
       </div>
     </div>
   </div>
@@ -205,41 +206,28 @@
 
   <hr class="divider">
 
-  <!-- ご意見箱 -->
+  <!-- マニュアル資料 + ご意見箱 -->
   <div class="section">
-    <div class="section-title common">💬 ご意見・リクエスト</div>
     <div class="cols">
-      <div class="card">
-        <h3>📨 送り方</h3>
-        <div class="step"><div class="step-num">1</div><div class="step-text">左メニューの「ご意見箱」をタップ</div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-text">カテゴリを選択（リクエスト／ご意見・改善提案／その他）</div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-text">内容を入力して「送信する」をタップ</div></div>
-        <div class="note">「匿名で送る」にチェックすると名前が非表示になります</div>
-      </div>
-      <div class="card">
-        <h3>📋 投稿の確認</h3>
-        <ul>
-          <li>「自分の投稿」に送信済みの内容が表示されます</li>
-          <li>本社から返信が届くと <span class="badge badge-blue">返信済み</span> に変わります</li>
-          <li>他のスタイリストの投稿は見えません</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider">
-
-  <!-- パスワード変更 -->
-  <div class="section">
-    <div class="section-title common">👤 プロフィール・パスワード変更</div>
-    <div class="card" style="max-width:100%">
-      <h3>🔑 パスワードの変更方法</h3>
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div>
-          <div class="step"><div class="step-num">1</div><div class="step-text">左メニュー最下部「プロフィール」をタップ</div></div>
-          <div class="step"><div class="step-num">2</div><div class="step-text">「新しいパスワード」に入力し「変更する」をタップ</div></div>
+      <div>
+        <div class="section-title common">📁 マニュアル資料</div>
+        <div class="card" style="margin-top:6px">
+          <h3>📄 資料の閲覧方法</h3>
+          <div class="step"><div class="step-num">1</div><div class="step-text">左メニューの「マニュアル資料」をタップ</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text">カテゴリ別に資料が一覧表示されます</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-text">「開く」ボタンでPDF・画像を表示</div></div>
+          <div class="note">資料のアップロードは本社のみ可能です</div>
         </div>
-        <div class="note" style="flex:1">初回ログイン後に必ず変更してください。変更後のパスワードはこの端末に保存されます</div>
+      </div>
+      <div>
+        <div class="section-title common">💬 ご意見・リクエスト</div>
+        <div class="card" style="margin-top:6px">
+          <h3>📨 送り方</h3>
+          <div class="step"><div class="step-num">1</div><div class="step-text">左メニューの「ご意見箱」をタップ</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text">カテゴリを選択して内容を入力</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-text">「送信する」をタップ</div></div>
+          <div class="note">「匿名で送る」チェックで名前を非表示にできます。本社から返信が届くと <span class="badge badge-blue">返信済み</span> に変わります</div>
+        </div>
       </div>
     </div>
   </div>
@@ -255,8 +243,8 @@
 <div class="page">
 
   <div class="doc-header">
-    <h1>✂ Samurai System &nbsp; 操作マニュアル</h1>
-    <div class="sub">本社・管理者向け<br>ver. 2026.04</div>
+    <h1>⚔️ Samurai System &nbsp; 操作マニュアル</h1>
+    <div class="sub">本社・管理者向け<br>ver. 2026.05</div>
   </div>
 
   <!-- シフト管理 -->
@@ -268,22 +256,21 @@
         <div class="step"><div class="step-num purple">1</div><div class="step-text">「シフト管理」→「シフト希望一覧」タブで全員の希望を確認</div></div>
         <div class="step"><div class="step-num purple">2</div><div class="step-text">「シフト作成」タブに切り替え</div></div>
         <div class="step"><div class="step-num purple">3</div><div class="step-text">「希望を反映」ボタンで希望を自動配置</div></div>
-        <div class="step"><div class="step-num purple">4</div><div class="step-text">カレンダー上でスタッフを追加・削除して調整</div></div>
+        <div class="step"><div class="step-num purple">4</div><div class="step-text">カレンダーの日付をタップしてスタッフを追加・削除・時間調整</div></div>
         <div class="step"><div class="step-num purple">5</div><div class="step-text">「シフトを公開する」でスタイリストに公開</div></div>
-        <div class="note"><strong>赤枠の日</strong> = 早番または遅番が不足している日。解消してから公開してください</div>
+        <div class="note"><strong>赤枠の日</strong> = 早番または遅番が不足。解消してから公開してください</div>
       </div>
       <div class="card">
+        <h3>✏️ イレギュラーなシフト時間の入力</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">スタッフ選択モーダルで時間ドロップダウンを開く</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">一覧最下部「✏️ 任意時間を入力...」を選択</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">テキスト欄に時間を入力（例: <strong>11:00-14:00</strong>）</div></div>
+        <div class="note"><span class="badge badge-purple">紫色</span>で表示されます。スタイリストの希望提出では使用不可（本社専用）</div>
+        <hr class="divider">
         <h3>🏪 複数店舗の管理</h3>
         <ul>
-          <li>上部タブ「西新宿本店」「新宿三丁目」「渋谷東」で店舗を切り替え</li>
-          <li>複数タブを同時選択すると合算表示</li>
-          <li>赤枠は<strong>各店舗ごと</strong>に判定されます</li>
-        </ul>
-        <hr class="divider">
-        <h3>📁 CSVアップロード</h3>
-        <ul>
-          <li>既存シフト表をCSVで一括登録可能</li>
-          <li>「シフト管理」→「CSVアップロード」から実行</li>
+          <li>上部タブで「西新宿本店」「新宿三丁目」「渋谷東」を切り替え</li>
+          <li>複数タブ同時選択で合算表示・一括管理が可能</li>
         </ul>
       </div>
     </div>
@@ -300,16 +287,17 @@
         <div class="step"><div class="step-num purple">1</div><div class="step-text">「お知らせ」→「編集・投稿」タブをタップ</div></div>
         <div class="step"><div class="step-num purple">2</div><div class="step-text">タイトルと内容を入力</div></div>
         <div class="step"><div class="step-num purple">3</div><div class="step-text">対象店舗を選択（全店 or 特定店舗）</div></div>
-        <div class="step"><div class="step-num purple">4</div><div class="step-text">必要であれば「ピン留め」にチェック</div></div>
+        <div class="step"><div class="step-num purple">4</div><div class="step-text">必要に応じて「ピン留め」または「予約投稿」にチェック</div></div>
         <div class="step"><div class="step-num purple">5</div><div class="step-text">「投稿する」をタップ</div></div>
       </div>
       <div class="card">
-        <h3>📌 ピン留めと対象店舗</h3>
+        <h3>⏰ 予約投稿・その他機能</h3>
         <ul>
-          <li><span class="badge badge-purple">📌 ピン留め</span>一覧の最上部に固定表示されます</li>
-          <li>対象店舗を絞ると、指定した店舗のスタイリストにのみ表示されます</li>
-          <li>「全店」チェックで全員に表示</li>
-          <li>投稿済み一覧から削除が可能です</li>
+          <li><span class="badge badge-purple">⏰ 予約投稿</span>公開日時を指定。それまでスタイリストには非表示</li>
+          <li>予約中のお知らせは編集一覧に <span class="badge badge-purple">⏰ 予約中</span> バッジで表示</li>
+          <li><span class="badge badge-purple">📌 ピン留め</span>一覧の最上部に固定表示</li>
+          <li>投稿には日時・投稿者名が自動付与されます</li>
+          <li>投稿済み一覧から削除可能</li>
         </ul>
       </div>
     </div>
@@ -317,41 +305,28 @@
 
   <hr class="divider">
 
-  <!-- ご意見箱 -->
+  <!-- マニュアル資料 + スタイリスト管理 -->
   <div class="section">
-    <div class="section-title honsha">💬 ご意見・リクエストへの対応</div>
     <div class="cols">
-      <div class="card">
-        <h3>📥 確認と返信</h3>
-        <div class="step"><div class="step-num purple">1</div><div class="step-text">「ご意見箱」をタップ（本社のみ全件表示）</div></div>
-        <div class="step"><div class="step-num purple">2</div><div class="step-text">投稿一覧から件を確認（匿名投稿は「匿名」と表示）</div></div>
-        <div class="step"><div class="step-num purple">3</div><div class="step-text">返信欄に内容を入力して「返信する」</div></div>
-        <div class="note">返信するとスタイリスト側に「返信済み」バッジが表示されます</div>
+      <div>
+        <div class="section-title honsha">📁 マニュアル資料の管理</div>
+        <div class="card" style="margin-top:6px">
+          <h3>⬆️ アップロード手順</h3>
+          <div class="step"><div class="step-num purple">1</div><div class="step-text">「マニュアル資料」→「カテゴリ管理」でカテゴリを作成</div></div>
+          <div class="step"><div class="step-num purple">2</div><div class="step-text">カテゴリを選択してPDF・画像ファイルを選択</div></div>
+          <div class="step"><div class="step-num purple">3</div><div class="step-text">「アップロード」ボタンで保存（最大20MB）</div></div>
+          <div class="note">ファイルはSupabase Storageに保存されます。削除は本社のみ可能</div>
+        </div>
       </div>
-      <div class="card">
-        <h3>👥 スタイリスト管理</h3>
-        <div class="step"><div class="step-num purple">1</div><div class="step-text">「スタイリスト管理」で新規スタイリストを追加</div></div>
-        <div class="step"><div class="step-num purple">2</div><div class="step-text">名前・初期パスワード・所属店舗を設定</div></div>
-        <div class="step"><div class="step-num purple">3</div><div class="step-text">スタイリストに初期パスワードを伝え、本人がプロフィールから変更</div></div>
-        <div class="note">固定メンバー（STORE_MEMBERS）は削除不可です</div>
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider">
-
-  <!-- シフト閲覧（本社） -->
-  <div class="section">
-    <div class="section-title honsha">🗓 シフト閲覧（本社）</div>
-    <div class="card" style="max-width:100%">
-      <h3>🏪 店舗フィルター機能</h3>
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <ul style="flex:1">
-          <li>「全店 / 西新宿本店 / 新宿三丁目 / 渋谷東」タブで店舗を絞り込み</li>
-          <li>スタイリストには自分の店舗のシフトのみ表示されます</li>
-          <li>日付セルをタップすると全スタッフの詳細時間が確認できます</li>
-        </ul>
-        <div class="note" style="flex:1">本社はシフト公開前でも全店のシフトを閲覧できます</div>
+      <div>
+        <div class="section-title honsha">👥 スタイリスト管理</div>
+        <div class="card" style="margin-top:6px">
+          <h3>➕ スタイリストの追加</h3>
+          <div class="step"><div class="step-num purple">1</div><div class="step-text">名前・配属店舗・初期パスワードを入力して「追加」</div></div>
+          <div class="step"><div class="step-num purple">2</div><div class="step-text">追加後も一覧のドロップダウンで店舗を変更可能</div></div>
+          <div class="step"><div class="step-num purple">3</div><div class="step-text">スタイリストに初期パスワードを伝え、本人がプロフィールから変更</div></div>
+          <div class="note">固定メンバーは削除不可。追加したスタイリストのみ削除できます</div>
+        </div>
       </div>
     </div>
   </div>
@@ -363,16 +338,16 @@
     <div class="section-title common">❓ よくあるトラブル</div>
     <div class="cols3">
       <div class="card">
-        <h3>🔄 画面が古い</h3>
-        <p>画面を上から下にスワイプしてリロード。または一度ホーム画面に戻り再タップ</p>
+        <h3>🔄 画面が古い／更新されない</h3>
+        <p>ブラウザで <strong>Ctrl+Shift+R</strong>（Mac: Cmd+Shift+R）でハードリフレッシュ。PWAの場合は削除して再追加</p>
       </div>
       <div class="card">
-        <h3>📶 送信エラー</h3>
-        <p>Wi-Fi・通信状況を確認。月1回程度、本社がSupabase管理画面でプロジェクトを再起動してください</p>
+        <h3>📶 送信・通信エラー</h3>
+        <p>Wi-Fi・通信を確認。月1回程度 <strong>app.supabase.com</strong> でプロジェクトが「Healthy」か確認。一時停止中は「Resume」をタップ</p>
       </div>
       <div class="card">
         <h3>🔑 パスワード忘れ</h3>
-        <p>本社がスタイリスト管理から削除→再登録して初期パスワードを再発行してください</p>
+        <p>スタイリスト管理から対象者を削除→再登録して初期パスワードを再発行してください</p>
       </div>
     </div>
   </div>
