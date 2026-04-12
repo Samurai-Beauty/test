@@ -2062,6 +2062,8 @@ function doLogin() {
   loadFromSupabase();
   // 本日の予約をダッシュボード用に読み込み
   loadTodayReservations();
+  // シフトデータをSupabaseから復元（デバイス間同期）＋既存データを初回アップロード
+  migrateLocalShiftsToSupabase().then(() => loadShiftsFromSupabase());
   // 2026年5月シフト初期データ投入（未入力の場合のみ）
   seedMay2026IfNeeded();
 }
@@ -2815,12 +2817,14 @@ function saveMyReq(y, m, data) {
   const all = getAllReqs(y, m);
   all[currentUser] = data;
   localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(all));
+  saveShiftToSupabaseDebounced(y, m);
 }
 function isSubmitted(y, m, name) {
   return localStorage.getItem(shiftKey('ssub', y, m) + '_' + name) === '1';
 }
 function markSubmitted(y, m, name) {
   localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, '1');
+  saveShiftToSupabaseDebounced(y, m);
 }
 function getSched(y, m) {
   const raw = localStorage.getItem(shiftKey('ssched', y, m));
@@ -2828,6 +2832,7 @@ function getSched(y, m) {
 }
 function saveSched(y, m, data) {
   localStorage.setItem(shiftKey('ssched', y, m), JSON.stringify(data));
+  saveShiftToSupabaseDebounced(y, m);
 }
 function getSchedTimes(y, m) {
   const raw = localStorage.getItem(shiftKey('ssched_times', y, m));
@@ -2835,6 +2840,7 @@ function getSchedTimes(y, m) {
 }
 function saveSchedTimes(y, m, data) {
   localStorage.setItem(shiftKey('ssched_times', y, m), JSON.stringify(data));
+  saveShiftToSupabaseDebounced(y, m);
 }
 function getSchedStores(y, m) {
   const raw = localStorage.getItem(shiftKey('ssched_stores', y, m));
@@ -2842,6 +2848,7 @@ function getSchedStores(y, m) {
 }
 function saveSchedStores(y, m, data) {
   localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(data));
+  saveShiftToSupabaseDebounced(y, m);
 }
 // スタッフのホーム店舗を返す
 function getHomeStore(name) {
@@ -2856,6 +2863,96 @@ function isPublished(y, m) {
 }
 function markPublished(y, m) {
   localStorage.setItem(shiftKey('spub', y, m), '1');
+  saveShiftToSupabaseDebounced(y, m);
+}
+
+// ========================================
+// シフトデータ Supabase 同期
+// ========================================
+const _shiftSaveTimers = {};
+
+function saveShiftToSupabaseDebounced(y, m) {
+  const key = `${y}-${m}`;
+  clearTimeout(_shiftSaveTimers[key]);
+  _shiftSaveTimers[key] = setTimeout(() => saveShiftToSupabase(y, m), 1500);
+}
+
+async function saveShiftToSupabase(y, m) {
+  const ym = `${y}-${String(m).padStart(2, '0')}`;
+  const ssub = {};
+  getAllMembers().forEach(name => {
+    if (isSubmitted(y, m, name)) ssub[name] = '1';
+  });
+  const payload = {
+    ssched:        getSched(y, m),
+    sreq:          getAllReqs(y, m),
+    ssched_times:  getSchedTimes(y, m),
+    ssched_stores: getSchedStores(y, m),
+    spub:          isPublished(y, m) ? '1' : null,
+    ssub,
+  };
+  const hasData = Object.keys(payload.ssched).length > 0 || Object.keys(payload.sreq).length > 0;
+  if (!hasData) return;
+  const { error } = await sb.from('sales_data').upsert({
+    store_key:   `shift_${ym}`,
+    filename:    `shift_${ym}.json`,
+    data_json:   payload,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || '',
+  }, { onConflict: 'store_key' });
+  if (error) console.error('シフト保存エラー:', error.message);
+  else console.log(`シフト ${ym} をSupabaseに保存しました`);
+}
+
+async function loadShiftsFromSupabase() {
+  const { data, error } = await sb.from('sales_data')
+    .select('store_key, data_json')
+    .like('store_key', 'shift_%');
+  if (error || !data || data.length === 0) return;
+  data.forEach(row => {
+    const ym = row.store_key.replace('shift_', '');
+    const parts = ym.split('-');
+    if (parts.length !== 2) return;
+    const y = parseInt(parts[0]), m = parseInt(parts[1]);
+    const d = row.data_json;
+    if (!d) return;
+    // Supabaseを正として上書き（デバイス間同期）
+    if (d.ssched)        localStorage.setItem(shiftKey('ssched', y, m),        JSON.stringify(d.ssched));
+    if (d.sreq)          localStorage.setItem(shiftKey('sreq', y, m),          JSON.stringify(d.sreq));
+    if (d.ssched_times)  localStorage.setItem(shiftKey('ssched_times', y, m),  JSON.stringify(d.ssched_times));
+    if (d.ssched_stores) localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(d.ssched_stores));
+    if (d.spub)          localStorage.setItem(shiftKey('spub', y, m),          d.spub);
+    if (d.ssub) {
+      Object.entries(d.ssub).forEach(([name, val]) => {
+        localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, val);
+      });
+    }
+  });
+  // 現在シフト画面を表示中なら再描画
+  const active = document.querySelector('.section.active');
+  if (active) {
+    const id = active.id;
+    if      (id === 'section-shift-view')    renderShiftView();
+    else if (id === 'section-shift-manage')  renderShiftManage();
+    else if (id === 'section-shift-request') renderShiftRequest();
+    else if (id === 'section-dashboard')     renderTodayStaff();
+  }
+}
+
+// ログイン時：既存のlocalShiftデータをSupabaseに一括アップロード（初回マイグレーション）
+async function migrateLocalShiftsToSupabase() {
+  const months = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    const m = key.match(/^(?:ssched|sreq|ssched_times|ssched_stores|spub)_(\d{4}-\d{2})$/);
+    if (m) months.add(m[1]);
+  }
+  for (const ym of months) {
+    const [y, mo] = ym.split('-').map(Number);
+    await saveShiftToSupabase(y, mo);
+  }
+  if (months.size > 0) console.log(`シフトデータ ${months.size}ヶ月分をSupabaseに移行しました`);
 }
 
 // ========================================
