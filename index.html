@@ -451,6 +451,9 @@
       <div class="nav-item" onclick="showSection('notice')" id="nav-notice">
         <span class="icon">📢</span><span>お知らせ</span>
       </div>
+      <div class="nav-item" onclick="showSection('reservations')" id="nav-reservations">
+        <span class="icon">📆</span><span>本日の予約</span>
+      </div>
       <div class="nav-divider"></div>
       <div class="nav-item" onclick="showSection('shift-request')" id="nav-shift-request">
         <span class="icon">📅</span><span>シフト希望</span>
@@ -491,6 +494,15 @@
         <div class="card">
           <div class="card-title">📢 お知らせ</div>
           <div id="homeNoticeList"><div style="color:#aaa;font-size:13px;text-align:center;padding:20px">お知らせはまだありません</div></div>
+        </div>
+
+        <!-- 本日の予約サマリー -->
+        <div class="card" style="margin-top:16px" id="homeReservationCard">
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>📆 本日の予約</span>
+            <button onclick="loadTodayReservations(true)" style="font-size:11px;padding:4px 10px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer">更新</button>
+          </div>
+          <div id="homeReservationSummary" style="margin-top:8px;color:#aaa;font-size:13px;text-align:center;padding:12px">読み込み中...</div>
         </div>
 
         <!-- 同期バー -->
@@ -768,6 +780,17 @@
       </div>
 
       <!-- ====== シフト閲覧 ====== -->
+      <!-- ====== 本日の予約 ====== -->
+      <div class="section" id="section-reservations">
+        <div class="section-title">📆 本日の予約</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div id="reservationDateLabel" style="font-size:14px;color:#555;font-weight:600"></div>
+          <button onclick="loadTodayReservations(true)" style="font-size:12px;padding:6px 16px;background:#0f3460;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">🔄 更新</button>
+          <span id="reservationLastUpdate" style="font-size:11px;color:#aaa"></span>
+        </div>
+        <div id="reservationList" style="color:#aaa;text-align:center;padding:30px;font-size:14px">読み込み中...</div>
+      </div>
+
       <div class="section" id="section-shift-view">
         <div class="section-title">シフト閲覧</div>
 
@@ -2037,6 +2060,8 @@ function doLogin() {
   scheduleDashboardUpdates();
   // Supabase から売上データを復元
   loadFromSupabase();
+  // 本日の予約をダッシュボード用に読み込み
+  loadTodayReservations();
   // 2026年5月シフト初期データ投入（未入力の場合のみ）
   seedMay2026IfNeeded();
 }
@@ -2132,6 +2157,7 @@ function showSection(name) {
   else if (name === 'notice') { renderNoticeList(); }
   else if (name === 'documents') { loadDocuments().then(() => renderDocuments()); }
   else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
+  else if (name === 'reservations') { loadTodayReservations(); }
 }
 
 // ========================================
@@ -3565,6 +3591,151 @@ function shiftViewNext() {
   shiftViewMonth.m++;
   if (shiftViewMonth.m > 12) { shiftViewMonth.m = 1; shiftViewMonth.y++; }
   renderShiftView();
+}
+
+// ========================================
+// 本日の予約
+// ========================================
+const STORE_LABELS_RES = {
+  nishishinjuku: '西新宿本店',
+  sanchome:      '新宿三丁目',
+  shibuya:       '渋谷東',
+};
+const SOURCE_LABELS = {
+  salonboard:   { label: 'SALONBOARD', color: '#c0392b' },
+  salonconnect: { label: 'SALONCONNECT', color: '#2471a3' },
+};
+
+async function loadTodayReservations(forceRefresh = false) {
+  // 今日の日付（JST）
+  const today = new Date().toLocaleDateString('ja-JP', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).replace(/\//g, '-').replace(/(\d{4})\/(\d{2})\/(\d{2})/, '$1-$2-$3');
+
+  const todayStr = (() => {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const dy = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${dy}`;
+  })();
+
+  const dateEl = document.getElementById('reservationDateLabel');
+  if (dateEl) {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    dateEl.textContent = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
+  }
+
+  const listEl  = document.getElementById('reservationList');
+  const homeEl  = document.getElementById('homeReservationSummary');
+  const lastEl  = document.getElementById('reservationLastUpdate');
+  if (listEl) listEl.innerHTML = '<div style="color:#aaa;text-align:center;padding:30px">読み込み中...</div>';
+
+  try {
+    // store_key フィルター（本社は全店舗、それ以外は自店舗のみ）
+    let url = `${SUPABASE_URL}/rest/v1/reservations?reservation_date=eq.${todayStr}&order=datetime.asc&select=*`;
+    if (currentStore !== 'honsha') {
+      url += `&store_key=eq.${currentStore}`;
+    }
+
+    const res = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    const rows = await res.json();
+
+    if (lastEl) lastEl.textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+
+    renderTodayReservations(rows, listEl, homeEl, todayStr);
+  } catch(e) {
+    if (listEl) listEl.innerHTML = '<div style="color:#e74c3c;text-align:center;padding:20px">通信エラー。再試行してください。</div>';
+    if (homeEl) homeEl.innerHTML = '<span style="color:#e74c3c">取得失敗</span>';
+  }
+}
+
+function renderTodayReservations(rows, listEl, homeEl, todayStr) {
+  // キャンセルを除外
+  const active = (rows || []).filter(r => r.status !== 'cancelled');
+  const cancelled = (rows || []).filter(r => r.status === 'cancelled');
+
+  // ホームのサマリー更新
+  if (homeEl) {
+    if (active.length === 0) {
+      homeEl.innerHTML = '<span style="color:#aaa">本日の予約はありません</span>';
+    } else {
+      const byStore = {};
+      active.forEach(r => { byStore[r.store_key] = (byStore[r.store_key] || 0) + 1; });
+      const parts = Object.entries(byStore).map(([k, n]) =>
+        `<span style="color:${STORE_COLORS[k]||'#333'};font-weight:700">${STORE_LABELS_RES[k]||k} ${n}件</span>`
+      );
+      homeEl.innerHTML = `合計 <strong>${active.length}件</strong>　${parts.join('　')}
+        <button onclick="showSection('reservations')" style="margin-left:10px;font-size:11px;padding:3px 10px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer">詳細を見る</button>`;
+    }
+  }
+
+  if (!listEl) return;
+
+  if (active.length === 0 && cancelled.length === 0) {
+    listEl.innerHTML = '<div style="color:#aaa;text-align:center;padding:40px;font-size:14px">本日の予約データがありません<br><span style="font-size:12px">予約通知メールが届いたら自動で同期されます</span></div>';
+    return;
+  }
+
+  // 店舗ごとにグループ化
+  const storeOrder = currentStore === 'honsha'
+    ? ['nishishinjuku', 'sanchome', 'shibuya']
+    : [currentStore];
+
+  let html = '';
+  storeOrder.forEach(storeKey => {
+    const storeRows = active.filter(r => r.store_key === storeKey);
+    if (currentStore === 'honsha' && storeRows.length === 0) return;
+
+    const sc = STORE_COLORS[storeKey] || '#555';
+    html += `<div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:800;color:${sc};padding:8px 12px;background:${sc}18;border-radius:8px;margin-bottom:10px;border-left:4px solid ${sc}">
+        ${STORE_LABELS_RES[storeKey] || storeKey}　<span style="font-weight:400;font-size:12px">${storeRows.length}件</span>
+      </div>`;
+
+    if (storeRows.length === 0) {
+      html += '<div style="color:#bbb;font-size:13px;padding:8px 12px">予約なし</div>';
+    } else {
+      storeRows.forEach(r => {
+        const time = r.datetime ? r.datetime.slice(11, 16) : '--:--';
+        const src  = SOURCE_LABELS[r.source] || { label: r.source, color: '#888' };
+        const staff = r.staff_name || '指名なし';
+        const menu  = r.menu || '（メニュー未取得）';
+        const dur   = r.duration_min ? `${r.duration_min}分` : '';
+        const amt   = r.amount ? r.amount : '';
+        html += `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid #f0f0f0;border-radius:10px;margin-bottom:8px;background:#fff">
+          <div style="font-size:20px;font-weight:800;color:#0f3460;min-width:48px;text-align:center;padding-top:2px">${time}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="font-size:14px;font-weight:700;color:#1a1a2e">${r.customer_name || '（氏名未取得）'}</span>
+              <span style="font-size:10px;font-weight:700;color:${src.color};background:${src.color}18;padding:2px 7px;border-radius:10px">${src.label}</span>
+            </div>
+            <div style="font-size:12px;color:#555;margin-bottom:2px">📋 ${menu}${dur ? '　⏱ '+dur : ''}</div>
+            <div style="font-size:12px;color:#888">👤 ${staff}${amt ? '　💴 '+amt : ''}</div>
+          </div>
+        </div>`;
+      });
+    }
+    html += '</div>';
+  });
+
+  // キャンセル分を末尾に折りたたみ表示
+  if (cancelled.length > 0) {
+    html += `<details style="margin-top:8px">
+      <summary style="font-size:12px;color:#aaa;cursor:pointer;padding:8px">キャンセル済み（${cancelled.length}件）</summary>
+      <div style="opacity:0.5">`;
+    cancelled.forEach(r => {
+      const time = r.datetime ? r.datetime.slice(11, 16) : '--:--';
+      html += `<div style="display:flex;gap:12px;padding:8px 12px;font-size:12px;color:#999;text-decoration:line-through">
+        <span>${time}</span><span>${r.customer_name}</span><span>${r.store_name}</span>
+      </div>`;
+    });
+    html += '</div></details>';
+  }
+
+  listEl.innerHTML = html;
 }
 
 // ========================================
