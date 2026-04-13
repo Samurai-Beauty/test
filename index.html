@@ -2063,9 +2063,84 @@ function doLogin() {
   // 本日の予約をダッシュボード用に読み込み
   loadTodayReservations();
   // シフトデータをSupabaseから復元（デバイス間同期）＋既存データを初回アップロード
-  migrateLocalShiftsToSupabase().then(() => loadShiftsFromSupabase());
+  migrateLocalShiftsToSupabase().then(() => loadShiftsFromSupabase()).then(() => seedApril2026IfNeeded());
   // 2026年5月シフト初期データ投入（未入力の場合のみ）
   seedMay2026IfNeeded();
+}
+
+async function seedApril2026IfNeeded() {
+  const y = 2026, m = 4;
+  if (localStorage.getItem(shiftKey('ssched', y, m))) return; // 既存データがあればスキップ
+
+  // 画像から読み取った4月シフト
+  // 西新宿本店: 小川真央・矢澤南奈  新宿三丁目: 沖中真奈・三浦さら
+  const sched = {
+    '11': ['沖中真奈'],
+    '13': ['沖中真奈'],
+    '14': ['矢澤南奈', '三浦さら'],
+    '15': ['三浦さら'],
+    '16': ['矢澤南奈', '三浦さら'],
+    '17': ['矢澤南奈', '沖中真奈'],
+    '18': ['沖中真奈'],
+    '19': ['小川真央', '矢澤南奈'],
+    '20': ['矢澤南奈', '三浦さら'],
+    '21': ['矢澤南奈', '三浦さら'],
+    '22': ['小川真央', '三浦さら'],
+    '23': ['矢澤南奈', '三浦さら'],
+    '24': ['矢澤南奈', '三浦さら'],
+    '25': ['矢澤南奈', '三浦さら'],
+    '27': ['沖中真奈'],
+    '28': ['矢澤南奈', '三浦さら'],
+    '30': ['矢澤南奈', '三浦さら'],
+  };
+  const schedTimes = {
+    '11': { '沖中真奈': 'custom:17:00-22:00' },
+    '13': { '沖中真奈': 'early' },
+    '14': { '矢澤南奈': 'early', '三浦さら': 'custom:17:00-22:00' },
+    '15': { '三浦さら': 'custom:17:00-22:00' },
+    '18': { '沖中真奈': 'custom:17:00-22:00' },
+    '19': { '小川真央': 'h11-17', '矢澤南奈': 'h11-17' },
+    '20': { '矢澤南奈': 'early', '三浦さら': 'custom:17:00-22:00' },
+    '21': { '矢澤南奈': 'early' },
+    '22': { '小川真央': 'h11-17' },
+    '25': { '矢澤南奈': 'custom:17:00-22:00' },
+    '27': { '沖中真奈': 'early' },
+  };
+  const schedStores = {
+    '11': { '沖中真奈': 'sanchome' },
+    '13': { '沖中真奈': 'sanchome' },
+    '14': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '15': { '三浦さら': 'sanchome' },
+    '16': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '17': { '矢澤南奈': 'nishishinjuku', '沖中真奈': 'sanchome' },
+    '18': { '沖中真奈': 'sanchome' },
+    '19': { '小川真央': 'nishishinjuku', '矢澤南奈': 'nishishinjuku' },
+    '20': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '21': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '22': { '小川真央': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '23': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '24': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '25': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '27': { '沖中真奈': 'sanchome' },
+    '28': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+    '30': { '矢澤南奈': 'nishishinjuku', '三浦さら': 'sanchome' },
+  };
+
+  localStorage.setItem(shiftKey('ssched',        y, m), JSON.stringify(sched));
+  localStorage.setItem(shiftKey('ssched_times',  y, m), JSON.stringify(schedTimes));
+  localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(schedStores));
+  localStorage.setItem(shiftKey('spub',          y, m), '1'); // 公開済み
+
+  await saveShiftToSupabase(y, m);
+  console.log('4月2026シフトをSupabaseに保存しました');
+
+  // 現在シフト画面表示中なら再描画
+  const active = document.querySelector('.section.active');
+  if (active) {
+    if      (active.id === 'section-shift-view')   renderShiftView();
+    else if (active.id === 'section-shift-manage') renderShiftManage();
+    else if (active.id === 'section-dashboard')    renderTodayStaff();
+  }
 }
 
 function seedMay2026IfNeeded() {
