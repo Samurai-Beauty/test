@@ -2892,7 +2892,41 @@ function saveMyReq(y, m, data) {
   const all = getAllReqs(y, m);
   all[currentUser] = data;
   localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(all));
-  saveShiftToSupabaseDebounced(y, m);
+  // Supabase保存はマージ方式（他スタッフの提出データを上書きしない）
+  const key = `${y}-${m}`;
+  clearTimeout(_shiftSaveTimers[key]);
+  _shiftSaveTimers[key] = setTimeout(() => saveMyReqMerged(y, m), 1500);
+}
+
+// 自分の希望だけをSupabaseにマージ保存（他スタッフデータを保護）
+async function saveMyReqMerged(y, m) {
+  const ym = `${y}-${String(m).padStart(2, '0')}`;
+  const storeKey = `shift_${ym}`;
+  // リモートの最新sreqを取得してマージ
+  const { data: existing } = await sb.from('sales_data')
+    .select('data_json').eq('store_key', storeKey).maybeSingle();
+  const remoteReq = existing?.data_json?.sreq || {};
+  const localReq = getAllReqs(y, m);
+  // リモートの他スタッフデータ ＋ 自分のローカルデータで上書き
+  const mergedReq = { ...remoteReq, ...localReq };
+  localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(mergedReq));
+  // ssub も同様にマージ
+  const remoteSub = existing?.data_json?.ssub || {};
+  const localSub = {};
+  getAllMembers().forEach(name => { if (isSubmitted(y, m, name)) localSub[name] = '1'; });
+  const ssub = { ...remoteSub, ...localSub };
+  const payload = {
+    ssched:        existing?.data_json?.ssched || getSched(y, m),
+    sreq:          mergedReq,
+    ssched_times:  existing?.data_json?.ssched_times || getSchedTimes(y, m),
+    ssched_stores: existing?.data_json?.ssched_stores || getSchedStores(y, m),
+    spub:          existing?.data_json?.spub || (isPublished(y, m) ? '1' : null),
+    ssub,
+  };
+  await sb.from('sales_data').upsert({
+    store_key: storeKey, filename: `${storeKey}.json`,
+    data_json: payload, uploaded_at: new Date().toISOString(), uploaded_by: currentUser || '',
+  }, { onConflict: 'store_key' });
 }
 function isSubmitted(y, m, name) {
   return localStorage.getItem(shiftKey('ssub', y, m) + '_' + name) === '1';
@@ -3390,8 +3424,16 @@ function renderManageSchedCal(y, m) {
   document.getElementById('manageSchedCalendar').innerHTML = html;
 }
 
-function applyRequestsToSchedule() {
+async function applyRequestsToSchedule() {
   const { y, m } = shiftManageMonth;
+  // Supabaseから最新の提出データを取得してからlocalStorageを更新
+  const ym = `${y}-${String(m).padStart(2, '0')}`;
+  const { data: remote } = await sb.from('sales_data')
+    .select('data_json').eq('store_key', `shift_${ym}`).maybeSingle();
+  if (remote?.data_json?.sreq) {
+    localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(remote.data_json.sreq));
+  }
+
   const allReqs = getAllReqs(y, m);
   const members = getMembersForManage();
   const sched = getSched(y, m);
@@ -3405,11 +3447,12 @@ function applyRequestsToSchedule() {
       if (!sched[day]) sched[day] = [];
       if (!sched[day].includes(name)) { sched[day].push(name); changed = true; }
       if (!schedTimes[day]) schedTimes[day] = {};
+      // 未設定のみ書き込み（管理者による手動変更を保護）
       if (!schedTimes[day][name]) { schedTimes[day][name] = sk; changed = true; }
     });
   });
 
-  if (!changed) { alert('反映する希望シフトがありません。'); return; }
+  if (!changed) { alert('反映する希望シフトがありません。\n全員提出済みか確認してください。'); return; }
   saveSched(y, m, sched);
   saveSchedTimes(y, m, schedTimes);
   renderManageSchedCal(y, m);
