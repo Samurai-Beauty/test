@@ -2899,29 +2899,28 @@ function saveMyReq(y, m, data) {
 }
 
 // 自分の希望だけをSupabaseにマージ保存（他スタッフデータを保護）
+// ルール: リモートを基準に、currentUser のデータのみローカルで上書き
 async function saveMyReqMerged(y, m) {
   const ym = `${y}-${String(m).padStart(2, '0')}`;
   const storeKey = `shift_${ym}`;
-  // リモートの最新sreqを取得してマージ
   const { data: existing } = await sb.from('sales_data')
     .select('data_json').eq('store_key', storeKey).maybeSingle();
-  const remoteReq = existing?.data_json?.sreq || {};
-  const localReq = getAllReqs(y, m);
-  // リモートの他スタッフデータ ＋ 自分のローカルデータで上書き
-  const mergedReq = { ...remoteReq, ...localReq };
+  const remote = existing?.data_json || {};
+  // sreq: リモートを基準に currentUser のみ上書き（他スタッフのリモートデータを保持）
+  const mergedReq = { ...(remote.sreq || {}) };
+  const myReqData = getAllReqs(y, m)[currentUser];
+  if (myReqData) mergedReq[currentUser] = myReqData;
   localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(mergedReq));
-  // ssub も同様にマージ
-  const remoteSub = existing?.data_json?.ssub || {};
-  const localSub = {};
-  getAllMembers().forEach(name => { if (isSubmitted(y, m, name)) localSub[name] = '1'; });
-  const ssub = { ...remoteSub, ...localSub };
+  // ssub: リモートを基準に currentUser のみ上書き
+  const mergedSub = { ...(remote.ssub || {}) };
+  if (isSubmitted(y, m, currentUser)) mergedSub[currentUser] = '1';
   const payload = {
-    ssched:        existing?.data_json?.ssched || getSched(y, m),
+    ssched:        remote.ssched        || getSched(y, m),
     sreq:          mergedReq,
-    ssched_times:  existing?.data_json?.ssched_times || getSchedTimes(y, m),
-    ssched_stores: existing?.data_json?.ssched_stores || getSchedStores(y, m),
-    spub:          existing?.data_json?.spub || (isPublished(y, m) ? '1' : null),
-    ssub,
+    ssched_times:  remote.ssched_times  || getSchedTimes(y, m),
+    ssched_stores: remote.ssched_stores || getSchedStores(y, m),
+    spub:          remote.spub          || (isPublished(y, m) ? '1' : null),
+    ssub:          mergedSub,
   };
   await sb.from('sales_data').upsert({
     store_key: storeKey, filename: `${storeKey}.json`,
@@ -2933,7 +2932,10 @@ function isSubmitted(y, m, name) {
 }
 function markSubmitted(y, m, name) {
   localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, '1');
-  saveShiftToSupabaseDebounced(y, m);
+  // マージ方式で保存（saveMyReqと同じタイマーキーを共有し常にmergedで保存）
+  const key = `${y}-${m}`;
+  clearTimeout(_shiftSaveTimers[key]);
+  _shiftSaveTimers[key] = setTimeout(() => saveMyReqMerged(y, m), 1500);
 }
 function getSched(y, m) {
   const raw = localStorage.getItem(shiftKey('ssched', y, m));
@@ -3447,8 +3449,8 @@ async function applyRequestsToSchedule() {
       if (!sched[day]) sched[day] = [];
       if (!sched[day].includes(name)) { sched[day].push(name); changed = true; }
       if (!schedTimes[day]) schedTimes[day] = {};
-      // 未設定のみ書き込み（管理者による手動変更を保護）
-      if (!schedTimes[day][name]) { schedTimes[day][name] = sk; changed = true; }
+      // 希望から取り込み（スタッフが提出した最新時間で常に上書き）
+      if (schedTimes[day][name] !== sk) { schedTimes[day][name] = sk; changed = true; }
     });
   });
 
