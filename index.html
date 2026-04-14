@@ -3027,12 +3027,21 @@ async function loadShiftsFromSupabase() {
     const y = parseInt(parts[0]), m = parseInt(parts[1]);
     const d = row.data_json;
     if (!d) return;
-    // Supabaseを正として上書き（デバイス間同期）
+    // ssched/ssched_times/ssched_stores/spub はSupabaseを正として上書き（管理者データ）
     if (d.ssched)        localStorage.setItem(shiftKey('ssched', y, m),        JSON.stringify(d.ssched));
-    if (d.sreq)          localStorage.setItem(shiftKey('sreq', y, m),          JSON.stringify(d.sreq));
     if (d.ssched_times)  localStorage.setItem(shiftKey('ssched_times', y, m),  JSON.stringify(d.ssched_times));
     if (d.ssched_stores) localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(d.ssched_stores));
     if (d.spub)          localStorage.setItem(shiftKey('spub', y, m),          d.spub);
+    // sreq は「リモートを基準に、currentUser の既存ローカルデータを保持」してマージ
+    // ─ ログイン時にSupabaseの壊れたデータで自分の正しいデータが上書きされるのを防ぐ
+    if (d.sreq) {
+      const localReq = getAllReqs(y, m);
+      const mergedReq = { ...d.sreq };
+      if (currentUser && localReq[currentUser] && Object.keys(localReq[currentUser]).length > 0) {
+        mergedReq[currentUser] = localReq[currentUser]; // 自分のローカルデータを優先
+      }
+      localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(mergedReq));
+    }
     if (d.ssub) {
       Object.entries(d.ssub).forEach(([name, val]) => {
         localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, val);
@@ -3111,6 +3120,11 @@ function renderShiftRequest() {
   const badge = document.getElementById('shiftReqBadge');
   badge.textContent = submitted ? '提出済み' : '未提出';
   badge.className = 'submit-badge ' + (submitted ? 'done' : 'pending');
+
+  // 提出済みの場合はバックグラウンドでSupabaseに再同期（他スタッフのデータを保護しつつ）
+  if (submitted) {
+    saveMyReqMerged(y, m).catch(() => {});
+  }
   // 期限ラベル
   const dlLabel = document.getElementById('shiftReqDeadlineLabel');
   if (locked) {
