@@ -3684,6 +3684,7 @@ function renderShiftView() {
         storeStaff.forEach(name => {
           const me = name === currentUser;
           const reqKey = dayTimesV[name] || (allReqsView[name] || {})[String(day)];
+          if (reqKey === 'off') return; // 休み希望は表示しない
           const timeShort = reqKey ? shiftShort(reqKey) : '';
           const shortName = name.slice(0, 2);
           if (me) {
@@ -3726,6 +3727,7 @@ function showViewDayDetail(y, m, day) {
     } else {
       storeStaff.forEach(name => {
         const reqKey = dayTimesV[name] || (allReqsV[name] || {})[String(day)];
+        if (reqKey === 'off') return; // 休み希望は表示しない
         const timeLabel = reqKey ? shiftLong(reqKey) : '—';
         const c = reqKey ? getShiftColor(reqKey) : { bg: '#1a1a2e', text: '#fff' };
         const isMe = name === currentUser;
