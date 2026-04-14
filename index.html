@@ -3659,14 +3659,20 @@ function renderShiftView() {
     const { day, dow } = cell;
     const allStaff = sched[String(day)] || [];
     const dayTimesV = schedTimesView[String(day)] || {};
+    const dayStoreMap = schedStoresView[String(day)] || {};
     const holidayV = isHoliday(y, m, day);
     let cls = 'cal-cell view-cell ' + (holidayV && dow !== 0 ? 'sun' : WEEKDAY_CLS[dow]);
     if (isToday(y, m, day)) cls += ' today';
-    html += `<div class="${cls}" onclick="showViewDayDetail(${y},${m},${day})">`;
+    // 未カバー日は赤枠（シフト管理と同じ判定）
+    const coveredV = selectedStores.every(store => {
+      const storeStaff = allStaff.filter(n => (dayStoreMap[n] || getHomeStore(n)) === store);
+      return isStoreCovered(storeStaff, day, dow, dayTimesV, allReqsView, y, m);
+    });
+    const uncoveredStyleV = !coveredV ? 'border:2px solid #e74c3c !important;' : '';
+    html += `<div class="${cls}" style="${uncoveredStyleV}" onclick="showViewDayDetail(${y},${m},${day})">`;
     html += `<div class="day-num">${day}${holidayV ? '<span style="font-size:8px;color:#e74c3c;margin-left:2px">祝</span>' : ''}</div>`;
 
     // 店舗ごとにグループ表示（全ユーザー共通）
-    const dayStoreMap = schedStoresView[String(day)] || {};
     selectedStores.forEach((store, si) => {
       const sc = STORE_COLORS[store] || '#555';
       if (si > 0) html += `<div style="width:100%;margin:3px 0 2px;border-top:1px dashed #ddd"></div>`;
