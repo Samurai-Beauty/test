@@ -2990,23 +2990,34 @@ function saveShiftToSupabaseDebounced(y, m) {
 
 async function saveShiftToSupabase(y, m) {
   const ym = `${y}-${String(m).padStart(2, '0')}`;
+  const storeKey = `shift_${ym}`;
+  // リモートのsreqを先に取得してマージ
+  // ─ 管理者がスケジュール保存してもスタイリストの提出データを上書きしないため
+  const { data: existing } = await sb.from('sales_data')
+    .select('data_json').eq('store_key', storeKey).maybeSingle();
+  const remoteSreq = existing?.data_json?.sreq || {};
+  const localSreq  = getAllReqs(y, m);
+  // ローカルにある各スタッフデータを基準に、リモートにしかないスタッフデータを追加
+  // （リモート優先: ログイン後にスタイリストが提出したデータをリモートから保護）
+  const sreq = { ...localSreq, ...remoteSreq };
   const ssub = {};
   getAllMembers().forEach(name => {
     if (isSubmitted(y, m, name)) ssub[name] = '1';
   });
+  const ssched = getSched(y, m);
+  const hasData = Object.keys(ssched).length > 0 || Object.keys(sreq).length > 0;
+  if (!hasData) return;
   const payload = {
-    ssched:        getSched(y, m),
-    sreq:          getAllReqs(y, m),
+    ssched,
+    sreq,
     ssched_times:  getSchedTimes(y, m),
     ssched_stores: getSchedStores(y, m),
     spub:          isPublished(y, m) ? '1' : null,
     ssub,
   };
-  const hasData = Object.keys(payload.ssched).length > 0 || Object.keys(payload.sreq).length > 0;
-  if (!hasData) return;
   const { error } = await sb.from('sales_data').upsert({
-    store_key:   `shift_${ym}`,
-    filename:    `shift_${ym}.json`,
+    store_key:   storeKey,
+    filename:    `${storeKey}.json`,
     data_json:   payload,
     uploaded_at: new Date().toISOString(),
     uploaded_by: currentUser || '',
