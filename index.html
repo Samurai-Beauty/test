@@ -743,6 +743,12 @@
             <div class="store-tab active" id="manageTabReq" onclick="switchManageTab('requests')">📋 希望一覧</div>
             <div class="store-tab" id="manageTabSched" onclick="switchManageTab('schedule')">✏️ シフト作成</div>
           </div>
+
+        <!-- 未提出バナー（両タブ共通） -->
+        <div id="unsubmittedBanner" style="display:none;width:100%;margin-top:10px;padding:10px 14px;background:#fff3cd;border:1.5px solid #f0ad4e;border-radius:8px;font-size:13px;color:#856404">
+          <span style="font-weight:700">⚠ 未提出：</span>
+          <span id="unsubmittedNames"></span>
+        </div>
         </div>
 
         <!-- 店舗タブ -->
@@ -3290,22 +3296,44 @@ function renderShiftManage() {
   }
 }
 
+function updateUnsubmittedBanner(y, m) {
+  const members = getMembersForManage();
+  const unsub = members.filter(n => !isSubmitted(y, m, n));
+  const banner = document.getElementById('unsubmittedBanner');
+  const names  = document.getElementById('unsubmittedNames');
+  if (!banner || !names) return;
+  if (unsub.length === 0) {
+    banner.style.display = 'none';
+  } else {
+    names.textContent = unsub.join('、') + `（${unsub.length}名）`;
+    banner.style.display = 'block';
+  }
+}
+
 function renderManageReqTable(y, m) {
+  updateUnsubmittedBanner(y, m);
+
   const allReqs  = getAllReqs(y, m);
   const members  = getMembersForManage();
   const cnt = daysInMonth(y, m);
   const fd  = firstDow(y, m);
 
   const storeLabel = shiftManageStore.map(k => STORE_LABELS[k]).join('・');
+  const total = members.length;
+  const subCount = members.filter(n => isSubmitted(y, m, n)).length;
 
-  // 提出状況チップ
-  let statusHtml = `<div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px">${storeLabel}のスタッフ</div>`;
+  // 提出状況サマリー
+  let statusHtml = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">`;
+  statusHtml += `<span style="font-size:12px;font-weight:700;color:#555">${storeLabel}（${subCount}/${total}名提出済み）</span>`;
+  statusHtml += `</div>`;
   statusHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
   members.forEach(name => {
     const done = isSubmitted(y, m, name);
-    statusHtml += `<span style="font-size:12px;padding:3px 12px;border-radius:20px;font-weight:700;` +
-      `background:${done ? '#d4edda' : '#f8f9fa'};color:${done ? '#155724' : '#aaa'}">` +
-      name + (done ? ' ✓' : ' —') + '</span>';
+    if (done) {
+      statusHtml += `<span style="font-size:12px;padding:4px 12px;border-radius:20px;font-weight:700;background:#d4edda;color:#155724">${name} ✓</span>`;
+    } else {
+      statusHtml += `<span style="font-size:12px;padding:4px 12px;border-radius:20px;font-weight:700;background:#f8d7da;color:#721c24;border:1.5px solid #f5c6cb">${name} 未提出</span>`;
+    }
   });
   statusHtml += '</div>';
 
@@ -3391,6 +3419,7 @@ function isCoveredDay(day, dow, staffList, dayTimes, allReqs, schedStores, y, m)
 }
 
 function renderManageSchedCal(y, m) {
+  updateUnsubmittedBanner(y, m);
   const sched = getSched(y, m);
   const pub = isPublished(y, m);
   const badge = document.getElementById('schedPubBadge');
