@@ -3937,6 +3937,7 @@ async function renderShiftSwap() {
 }
 
 function _renderSwapStylist(container, allSwaps) {
+  const now = new Date();
   const storeSwaps = allSwaps.filter(s => s.store_key === currentStore);
   const received   = storeSwaps.filter(s => s.to_user === currentUser && s.status === 'pending');
   const sent       = storeSwaps.filter(s => s.from_user === currentUser);
@@ -4006,7 +4007,7 @@ function _renderSwapForm() {
 
   if (myDays.length === 0) {
     return `<div class="card"><div class="card-title">🔄 新規交換リクエスト（${y}年${m}月）</div>
-      <p style="color:#aaa;font-size:13px">シフトに入っていない日がありません</p></div>`;
+      <p style="color:#aaa;font-size:13px">シフトに入っている日がありません</p></div>`;
   }
 
   const storeMembers = getMembersOfStore(currentStore).filter(n => n !== currentUser);
@@ -4159,6 +4160,7 @@ async function _applySwap(sw) {
   saveSched(y, m, sched);
   saveSchedTimes(y, m, schedTimes);
   saveSchedStores(y, m, schedStores);
+  saveShiftToSupabaseDebounced(y, m);
 }
 
 function _renderSwapHistory(container, swaps) {
