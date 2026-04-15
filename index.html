@@ -464,6 +464,9 @@
       <div class="nav-item" onclick="showSection('shift-view')" id="nav-shift-view">
         <span class="icon">👁</span><span>シフト閲覧</span>
       </div>
+      <div class="nav-item" onclick="showSection('shift-swap')" id="nav-shift-swap">
+        <span class="icon">🔄</span><span>シフト交換</span>
+      </div>
       <div class="nav-item" onclick="showSection('stylist-manage')" id="nav-stylist-manage" style="display:none">
         <span class="icon">👥</span><span>スタイリスト管理</span>
       </div>
@@ -819,6 +822,14 @@
         <div id="shiftViewNotice" style="display:none" class="card"></div>
         <div class="card" id="shiftViewCard" style="display:none">
           <div id="shiftViewCalendar"></div>
+        </div>
+      </div>
+
+      <!-- ====== シフト交換 ====== -->
+      <div class="section" id="section-shift-swap">
+        <div class="section-title">🔄 シフト交換</div>
+        <div id="swapContent" style="padding-bottom:24px">
+          <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
         </div>
       </div>
 
@@ -2049,6 +2060,8 @@ function doLogin() {
   document.getElementById('nav-suggestions').style.display = 'flex';
   // シフト希望は管理者には非表示
   document.getElementById('nav-shift-request').style.display = isMgr ? 'none' : 'flex';
+  // シフト交換は本社以外（スタイリスト・店舗管理者）に表示、本社は履歴閲覧のみ
+  document.getElementById('nav-shift-swap').style.display = 'flex';
   // 店舗管理者はデフォルトで自店舗のみ表示
   if (isMgr && !isHonsha) {
     shiftManageStore = [store];
@@ -2241,6 +2254,7 @@ function showSection(name) {
   else if (name === 'documents') { loadDocuments().then(() => renderDocuments()); }
   else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
   else if (name === 'reservations') { loadTodayReservations(); }
+  else if (name === 'shift-swap') { renderShiftSwap(); }
 }
 
 // ========================================
@@ -3870,6 +3884,306 @@ function shiftViewNext() {
   shiftViewMonth.m++;
   if (shiftViewMonth.m > 12) { shiftViewMonth.m = 1; shiftViewMonth.y++; }
   renderShiftView();
+}
+
+// ============================================================
+// シフト交換
+// ============================================================
+// 【Supabase セットアップ】初回のみ SQL エディタで実行:
+// create table shift_swaps (
+//   id uuid default gen_random_uuid() primary key,
+//   from_user text not null, to_user text not null,
+//   store_key text not null, year int not null, month int not null,
+//   from_day int not null, to_day int not null,
+//   from_time text, to_time text,
+//   status text default 'pending',
+//   requested_at timestamptz default now(),
+//   responded_at timestamptz,
+//   expires_at timestamptz default (now() + interval '3 days'),
+//   message text
+// );
+// alter table shift_swaps enable row level security;
+// create policy "public access" on shift_swaps for all using (true);
+// ============================================================
+
+const SWAP_STATUS_LABEL = { pending:'⏳ 保留中', approved:'✅ 承認済み', rejected:'❌ 却下', expired:'⌛ 期限切れ' };
+const SWAP_STATUS_COLOR = { pending:'#e67e22', approved:'#27ae60', rejected:'#e74c3c', expired:'#aaa' };
+
+async function renderShiftSwap() {
+  const el = document.getElementById('swapContent');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>';
+  const isAdmin = currentStore === 'honsha';
+
+  // 期限切れを自動更新 + 全件取得
+  const { data: swaps, error } = await sb.from('shift_swaps')
+    .select('*').order('requested_at', { ascending: false });
+  if (error) { el.innerHTML = '<div style="color:#e74c3c;padding:20px">データ取得失敗</div>'; return; }
+
+  // 3日以上経過した pending を expired に更新
+  const now = new Date();
+  const toExpire = (swaps || []).filter(s => s.status === 'pending' && new Date(s.expires_at) < now);
+  if (toExpire.length > 0) {
+    await sb.from('shift_swaps').update({ status: 'expired' })
+      .in('id', toExpire.map(s => s.id));
+    toExpire.forEach(s => { s.status = 'expired'; });
+  }
+
+  if (isAdmin) {
+    _renderSwapHistory(el, swaps || []);
+  } else {
+    _renderSwapStylist(el, swaps || []);
+  }
+}
+
+function _renderSwapStylist(container, allSwaps) {
+  const storeSwaps = allSwaps.filter(s => s.store_key === currentStore);
+  const received   = storeSwaps.filter(s => s.to_user === currentUser && s.status === 'pending');
+  const sent       = storeSwaps.filter(s => s.from_user === currentUser);
+
+  let html = '';
+
+  // ── 受信リクエスト ──────────────────────────────
+  if (received.length > 0) {
+    html += `<div class="card" style="border:2px solid #e67e22;margin-bottom:16px">`;
+    html += `<div class="card-title" style="color:#e67e22">📨 交換リクエストが届いています（${received.length}件）</div>`;
+    received.forEach(sw => {
+      const daysLeft = Math.max(0, Math.ceil((new Date(sw.expires_at) - now) / 86400000));
+      html += `<div style="padding:12px 0;border-bottom:1px solid #f0f0f0">
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px">${sw.from_user} さんから</div>
+        <div style="font-size:13px;margin-bottom:4px">
+          <span style="color:#e67e22">📤 ${sw.month}月${sw.from_day}日（${sw.from_time ? shiftLong(sw.from_time) : '—'}）</span>
+          <span style="margin:0 6px">⇔</span>
+          <span style="color:#2980b9">📥 ${sw.month}月${sw.to_day}日（${sw.to_time ? shiftLong(sw.to_time) : '—'}）</span>
+        </div>`;
+      if (sw.message) html += `<div style="font-size:12px;color:#666;margin-bottom:4px">💬 ${sw.message}</div>`;
+      html += `<div style="font-size:11px;color:#e74c3c;margin-bottom:8px">⏰ あと${daysLeft}日以内に回答</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="respondToSwap('${sw.id}','approved')" style="background:#27ae60;color:#fff;border:none;padding:8px 22px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">✓ 承認</button>
+          <button onclick="respondToSwap('${sw.id}','rejected')" style="background:#e74c3c;color:#fff;border:none;padding:8px 22px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">✕ 却下</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ── 新規リクエスト作成フォーム ──────────────────
+  html += _renderSwapForm();
+
+  // ── 送信済みリスト ──────────────────────────────
+  const mySent = sent.slice(0, 10);
+  if (mySent.length > 0) {
+    html += `<div class="card" style="margin-top:16px"><div class="card-title">📤 送信したリクエスト</div>`;
+    mySent.forEach(sw => {
+      const sc = SWAP_STATUS_COLOR[sw.status] || '#555';
+      html += `<div style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-weight:700">${sw.to_user} へ</span>
+          <span style="color:${sc};font-weight:700">${SWAP_STATUS_LABEL[sw.status] || sw.status}</span>
+        </div>
+        <div style="color:#666">${sw.year}年${sw.month}月${sw.from_day}日 ⇔ ${sw.month}月${sw.to_day}日</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function _renderSwapForm() {
+  const { y, m } = shiftViewMonth;
+  const pub = isPublished(y, m);
+  if (!pub) {
+    return `<div class="card"><div class="card-title">🔄 新規交換リクエスト</div>
+      <p style="color:#aaa;font-size:13px">${y}年${m}月のシフトはまだ公開されていません</p></div>`;
+  }
+
+  const sched      = getSched(y, m);
+  const schedTimes = getSchedTimes(y, m);
+  const myDays = Object.entries(sched)
+    .filter(([, names]) => names.includes(currentUser))
+    .map(([d]) => +d).sort((a, b) => a - b);
+
+  if (myDays.length === 0) {
+    return `<div class="card"><div class="card-title">🔄 新規交換リクエスト（${y}年${m}月）</div>
+      <p style="color:#aaa;font-size:13px">シフトに入っていない日がありません</p></div>`;
+  }
+
+  const storeMembers = getMembersOfStore(currentStore).filter(n => n !== currentUser);
+  const DOW = ['日','月','火','水','木','金','土'];
+
+  let html = `<div class="card"><div class="card-title">🔄 新規交換リクエスト（${y}年${m}月）</div>
+    <div style="display:flex;flex-direction:column;gap:14px">`;
+
+  // 自分の日
+  html += `<div>
+    <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px">自分が出勤している日（渡したい日）</label>
+    <select id="swapFromDay" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+      <option value="">日付を選択</option>`;
+  myDays.forEach(d => {
+    const dow = new Date(y, m - 1, d).getDay();
+    const tk  = (schedTimes[String(d)] || {})[currentUser] || '';
+    html += `<option value="${d}" data-time="${tk}">${m}月${d}日（${DOW[dow]}）${tk ? shiftLong(tk) : '—'}</option>`;
+  });
+  html += `</select></div>`;
+
+  // 相手スタッフ
+  html += `<div>
+    <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px">交換相手</label>
+    <select id="swapToUser" onchange="updateSwapToDays()" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+      <option value="">スタッフを選択</option>`;
+  storeMembers.forEach(n => { html += `<option value="${n}">${n}</option>`; });
+  html += `</select></div>`;
+
+  // 相手の日（動的）
+  html += `<div>
+    <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px">相手の出勤日（もらいたい日）</label>
+    <select id="swapToDay" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+      <option value="">先にスタッフを選択</option>
+    </select></div>`;
+
+  // メッセージ
+  html += `<div>
+    <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px">メッセージ（任意）</label>
+    <textarea id="swapMessage" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;min-height:64px;box-sizing:border-box" placeholder="理由など"></textarea>
+  </div>`;
+
+  html += `<button onclick="submitSwapRequest()" style="width:100%;padding:13px;background:#0f3460;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">📤 リクエストを送信</button>`;
+  html += `</div></div>`;
+  return html;
+}
+
+function updateSwapToDays() {
+  const toUser = document.getElementById('swapToUser')?.value;
+  const toDayEl = document.getElementById('swapToDay');
+  if (!toDayEl) return;
+  if (!toUser) { toDayEl.innerHTML = '<option value="">先にスタッフを選択</option>'; return; }
+
+  const { y, m } = shiftViewMonth;
+  const sched = getSched(y, m);
+  const schedTimes = getSchedTimes(y, m);
+  const theirDays = Object.entries(sched)
+    .filter(([, names]) => names.includes(toUser))
+    .map(([d]) => +d).sort((a, b) => a - b);
+
+  const DOW = ['日','月','火','水','木','金','土'];
+  toDayEl.innerHTML = '<option value="">日付を選択</option>';
+  theirDays.forEach(d => {
+    const dow = new Date(y, m - 1, d).getDay();
+    const tk  = (schedTimes[String(d)] || {})[toUser] || '';
+    const opt = document.createElement('option');
+    opt.value = d; opt.dataset.time = tk;
+    opt.textContent = `${m}月${d}日（${DOW[dow]}）${tk ? shiftLong(tk) : '—'}`;
+    toDayEl.appendChild(opt);
+  });
+  if (theirDays.length === 0) toDayEl.innerHTML = `<option value="">${toUser}さんのシフトはありません</option>`;
+}
+
+async function submitSwapRequest() {
+  const fromDayEl = document.getElementById('swapFromDay');
+  const toUserEl  = document.getElementById('swapToUser');
+  const toDayEl   = document.getElementById('swapToDay');
+  const msgEl     = document.getElementById('swapMessage');
+
+  const fromDay = parseInt(fromDayEl?.value);
+  const toUser  = toUserEl?.value;
+  const toDay   = parseInt(toDayEl?.value);
+  if (!fromDay || !toUser || !toDay) { alert('すべての項目を選択してください'); return; }
+
+  const { y, m } = shiftViewMonth;
+  const schedTimes = getSchedTimes(y, m);
+  const fromTime = (schedTimes[String(fromDay)] || {})[currentUser] || '';
+  const toTime   = (schedTimes[String(toDay)]   || {})[toUser]      || '';
+
+  const exp = new Date(); exp.setDate(exp.getDate() + 3);
+  const { error } = await sb.from('shift_swaps').insert({
+    from_user: currentUser, to_user: toUser,
+    store_key: currentStore, year: y, month: m,
+    from_day: fromDay, to_day: toDay,
+    from_time: fromTime || null, to_time: toTime || null,
+    status: 'pending', message: msgEl?.value?.trim() || null,
+    expires_at: exp.toISOString(),
+  });
+  if (error) { alert('送信失敗: ' + error.message); return; }
+  alert(`${toUser}さんにリクエストを送りました！\n${m}月${fromDay}日 ⇔ ${m}月${toDay}日\n3日以内に返事がない場合は自動キャンセル`);
+  renderShiftSwap();
+}
+
+async function respondToSwap(swapId, action) {
+  const label = action === 'approved' ? '承認' : '却下';
+  const extra = action === 'approved' ? '\nスケジュールが自動で変更されます。' : '';
+  if (!confirm(`このシフト交換を${label}しますか？${extra}`)) return;
+
+  const { data: sw } = await sb.from('shift_swaps').select('*').eq('id', swapId).single();
+  if (!sw) { alert('データ取得失敗'); return; }
+
+  const { error } = await sb.from('shift_swaps')
+    .update({ status: action, responded_at: new Date().toISOString() }).eq('id', swapId);
+  if (error) { alert('処理失敗'); return; }
+
+  if (action === 'approved') {
+    await _applySwap(sw);
+    alert('承認しました！スケジュールを更新しました。');
+  } else {
+    alert('却下しました。');
+  }
+  renderShiftSwap();
+}
+
+async function _applySwap(sw) {
+  const { year: y, month: m, from_user, to_user, from_day, to_day, from_time, to_time, store_key } = sw;
+  const sched = getSched(y, m);
+  const schedTimes  = getSchedTimes(y, m);
+  const schedStores = getSchedStores(y, m);
+  const fd = String(from_day), td = String(to_day);
+
+  // sched: from_day に to_user、to_day に from_user
+  sched[fd] = (sched[fd] || []).filter(n => n !== from_user);
+  if (!sched[fd].includes(to_user)) sched[fd].push(to_user);
+  sched[td] = (sched[td] || []).filter(n => n !== to_user);
+  if (!sched[td].includes(from_user)) sched[td].push(from_user);
+
+  // schedTimes: シフト時間を入れ替え
+  if (!schedTimes[fd]) schedTimes[fd] = {};
+  delete schedTimes[fd][from_user];
+  if (from_time) schedTimes[fd][to_user] = from_time;
+
+  if (!schedTimes[td]) schedTimes[td] = {};
+  delete schedTimes[td][to_user];
+  if (to_time) schedTimes[td][from_user] = to_time;
+
+  // schedStores: 同店舗なのでstoreKeyを維持
+  if (schedStores[fd]) { delete schedStores[fd][from_user]; schedStores[fd][to_user] = store_key; }
+  if (schedStores[td]) { delete schedStores[td][to_user];   schedStores[td][from_user] = store_key; }
+
+  saveSched(y, m, sched);
+  saveSchedTimes(y, m, schedTimes);
+  saveSchedStores(y, m, schedStores);
+}
+
+function _renderSwapHistory(container, swaps) {
+  let html = `<div class="card"><div class="card-title">📋 シフト交換履歴（全店舗）</div>`;
+  if (swaps.length === 0) {
+    html += '<p style="color:#aaa;text-align:center;padding:20px">履歴はありません</p></div>';
+    container.innerHTML = html; return;
+  }
+  html += '<div class="req-table-wrap"><table class="req-table" style="font-size:12px"><thead><tr>' +
+    '<th>送信者</th><th>受信者</th><th>店舗</th><th>交換内容</th><th>ステータス</th><th>申請日</th>' +
+    '</tr></thead><tbody>';
+  swaps.forEach(sw => {
+    const sc = SWAP_STATUS_COLOR[sw.status] || '#555';
+    const dt = new Date(sw.requested_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+    html += `<tr>
+      <td style="font-weight:700">${sw.from_user}</td>
+      <td>${sw.to_user}</td>
+      <td style="font-size:11px">${STORE_LABELS[sw.store_key] || sw.store_key}</td>
+      <td>${sw.year}/${sw.month}/${sw.from_day}日 ⇔ ${sw.month}/${sw.to_day}日</td>
+      <td style="color:${sc};font-weight:700">${SWAP_STATUS_LABEL[sw.status] || sw.status}</td>
+      <td style="color:#aaa">${dt}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div></div>';
+  container.innerHTML = html;
 }
 
 // ========================================
