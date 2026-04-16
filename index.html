@@ -3727,6 +3727,7 @@ function doPublishShift() {
   const { y, m } = shiftManageMonth;
   if (!confirm(fmtMonth(y, m) + 'のシフトを公開しますか？')) return;
   markPublished(y, m);
+  saveShiftToSupabase(y, m).catch(e => console.error('公開保存エラー:', e));
   renderShiftManage();
   alert('シフトを公開しました！スタッフがシフト閲覧で確認できます。');
 }
