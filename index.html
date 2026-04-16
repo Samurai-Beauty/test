@@ -3166,14 +3166,29 @@ async function loadShiftsFromSupabase() {
       });
     }
   });
-  // 現在シフト画面を表示中なら再描画
-  const active = document.querySelector('.section.active');
-  if (active) {
-    const id = active.id;
-    if      (id === 'section-shift-view')    renderShiftView();
-    else if (id === 'section-shift-manage')  renderShiftManage();
-    else if (id === 'section-shift-request') renderShiftRequest();
-    else if (id === 'section-dashboard')     renderTodayStaff();
+  // honsha管理者の場合: 5月2026シフトを自動復元（一度だけ）
+  if (currentStore === 'honsha') {
+    _autoRestoreMay2026IfNeeded().then(() => {
+      // 復元後に現在シフト画面を表示中なら再描画
+      const active = document.querySelector('.section.active');
+      if (active) {
+        const id = active.id;
+        if      (id === 'section-shift-view')    renderShiftView();
+        else if (id === 'section-shift-manage')  renderShiftManage();
+        else if (id === 'section-shift-request') renderShiftRequest();
+        else if (id === 'section-dashboard')     renderTodayStaff();
+      }
+    });
+  } else {
+    // 現在シフト画面を表示中なら再描画
+    const active = document.querySelector('.section.active');
+    if (active) {
+      const id = active.id;
+      if      (id === 'section-shift-view')    renderShiftView();
+      else if (id === 'section-shift-manage')  renderShiftManage();
+      else if (id === 'section-shift-request') renderShiftRequest();
+      else if (id === 'section-dashboard')     renderTodayStaff();
+    }
   }
 }
 
@@ -3824,8 +3839,10 @@ function doPublishShift() {
   alert('シフトを公開しました！スタッフがシフト閲覧で確認できます。');
 }
 
-async function forceSaveMay2026() {
-  if (!confirm('スクリーンショットに基づき5月2026年のシフトを復元してSupabaseに保存します。よろしいですか？')) return;
+// 自動復元フラグ（このバージョンが保存されていれば再実行しない）
+const MAY2026_RESTORE_VER = 'tatsuomi-v1';
+
+async function _execRestoreMay2026(silent = false) {
   const y = 2026, m = 5;
   const ym = '2026-05';
   const storeKey = `shift_${ym}`;
@@ -3896,7 +3913,6 @@ async function forceSaveMay2026() {
     '30': {'清瀬陽香':'h11-17','矢澤南奈':'late','沖中真奈':'h11-17','三浦さら':'late'},
     '31': {'岡部実結':'late','沖中真奈':'h11-17','三浦さら':'late'},
   };
-  // クロス店舗配置のみ記録（デフォルト店舗と異なる場合のみ）
   const ssched_stores = {
     '6':  {'沖中真奈':'nishishinjuku'},
     '10': {'岡部実結':'nishishinjuku'},
@@ -3907,13 +3923,11 @@ async function forceSaveMay2026() {
     '31': {'岡部実結':'nishishinjuku'},
   };
 
-  // localStorage に保存
   localStorage.setItem(shiftKey('ssched',       y, m), JSON.stringify(ssched));
   localStorage.setItem(shiftKey('ssched_times', y, m), JSON.stringify(ssched_times));
   localStorage.setItem(shiftKey('ssched_stores',y, m), JSON.stringify(ssched_stores));
   localStorage.setItem(shiftKey('spub',         y, m), '1');
 
-  // リモートデータを取得して sreq / ssub を保持しつつ上書き保存
   try {
     const { data: existing } = await sb.from('sales_data')
       .select('data_json').eq('store_key', storeKey).maybeSingle();
@@ -3936,14 +3950,32 @@ async function forceSaveMay2026() {
       uploaded_by: currentUser || '',
     }, { onConflict: 'store_key' });
     if (error) throw error;
-    alert('5月シフトをSupabaseに復元しました！');
+    localStorage.setItem('may2026_restore_version', MAY2026_RESTORE_VER);
+    if (!silent) alert('5月シフトをSupabaseに復元しました！');
+    console.log('May2026 shift restored successfully');
   } catch (e) {
-    console.error('forceSaveMay2026 エラー:', e);
-    alert('Supabase保存に失敗しました: ' + e.message);
-    return;
+    console.error('May2026 restore error:', e);
+    if (!silent) alert('Supabase保存に失敗しました: ' + e.message);
   }
+}
+
+// honsha管理者ログイン時に一度だけ自動復元（バージョン違いなら再実行）
+async function _autoRestoreMay2026IfNeeded() {
+  if (currentStore !== 'honsha') return;
+  if (localStorage.getItem('may2026_restore_version') === MAY2026_RESTORE_VER) return;
+  console.log('May2026 auto-restoring shift data...');
+  await _execRestoreMay2026(true);
   renderShiftManage();
 }
+
+async function forceSaveMay2026() {
+  if (!confirm('スクリーンショットに基づき5月2026年のシフトを復元してSupabaseに保存します。よろしいですか？')) return;
+  // バージョンフラグをリセットして再強制実行
+  localStorage.removeItem('may2026_restore_version');
+  await _execRestoreMay2026(false);
+  renderShiftManage();
+}
+
 
 // ========================================
 // シフト閲覧
