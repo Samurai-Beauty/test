@@ -4634,14 +4634,25 @@ async function loadTodayReservations(forceRefresh = false) {
     const res = await fetch(url, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
-    const rows = await res.json();
+
+    const body = await res.json();
+
+    if (!res.ok) {
+      const msg = body?.message || body?.hint || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    if (!Array.isArray(body)) {
+      throw new Error('予期しないレスポース形式: ' + JSON.stringify(body).slice(0, 100));
+    }
 
     if (lastEl) lastEl.textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
-    renderTodayReservations(rows, listEl, homeEl, todayStr);
+    renderTodayReservations(body, listEl, homeEl, todayStr);
   } catch(e) {
-    if (listEl) listEl.innerHTML = '<div style="color:#e74c3c;text-align:center;padding:20px">通信エラー。再試行してください。</div>';
-    if (homeEl) homeEl.innerHTML = '<span style="color:#e74c3c">取得失敗</span>';
+    console.error('loadTodayReservations error:', e);
+    const msg = e.message || '不明なエラー';
+    if (listEl) listEl.innerHTML = `<div style="color:#e74c3c;text-align:center;padding:20px">取得エラー: ${msg}<br><small style="color:#aaa">Supabaseの設定を確認してください</small></div>`;
+    if (homeEl) homeEl.innerHTML = `<span style="color:#e74c3c">取得失敗: ${msg}</span>`;
   }
 }
 
@@ -4693,7 +4704,7 @@ function renderTodayReservations(rows, listEl, homeEl, todayStr) {
     } else {
       storeRows.forEach(r => {
         const time = r.datetime ? r.datetime.slice(11, 16) : '--:--';
-        const src  = SOURCE_LABELS[r.source] || { label: r.source, color: '#888' };
+        const src  = SOURCE_LABELS[r.source] || { label: r.source || '不明', color: '#888' };
         const staff = r.staff_name || '指名なし';
         const menu  = r.menu || '（メニュー未取得）';
         const dur   = r.duration_min ? `${r.duration_min}分` : '';
