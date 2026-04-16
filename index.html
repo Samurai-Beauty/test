@@ -3057,28 +3057,68 @@ function saveShiftToSupabaseDebounced(y, m) {
 async function saveShiftToSupabase(y, m) {
   const ym = `${y}-${String(m).padStart(2, '0')}`;
   const storeKey = `shift_${ym}`;
-  // リモートのsreqを先に取得してマージ
-  // ─ 管理者がスケジュール保存してもスタイリストの提出データを上書きしないため
+
+  // リモートデータを先に取得（全フィールドをマージするため）
   const { data: existing } = await sb.from('sales_data')
     .select('data_json').eq('store_key', storeKey).maybeSingle();
-  const remoteSreq = existing?.data_json?.sreq || {};
+  const remoteData = existing?.data_json || {};
+
+  // ── sreq マージ（リモート優先 ── スタイリスト提出データを保護）
+  const remoteSreq = remoteData.sreq || {};
   const localSreq  = getAllReqs(y, m);
-  // ローカルにある各スタッフデータを基準に、リモートにしかないスタッフデータを追加
-  // （リモート優先: ログイン後にスタイリストが提出したデータをリモートから保護）
   const sreq = { ...localSreq, ...remoteSreq };
-  const ssub = {};
-  getAllMembers().forEach(name => {
-    if (isSubmitted(y, m, name)) ssub[name] = '1';
+
+  // ── ssched / schedTimes / schedStores マージ ──────────────────
+  // 複数管理者アカウントが同一レコードを上書きし合わないよう、
+  // 「自分が担当する店舗のスタッフ」はローカル優先、
+  // 「他店舗のスタッフ」はリモートのデータを保持する。
+  const managedSet       = new Set(getMembersForManage());
+  const remoteSched      = remoteData.ssched        || {};
+  const remoteSchedTimes = remoteData.ssched_times  || {};
+  const remoteSchedStores= remoteData.ssched_stores || {};
+  const localSched       = getSched(y, m);
+  const localSchedTimes  = getSchedTimes(y, m);
+  const localSchedStores = getSchedStores(y, m);
+
+  // ssched
+  const mergedSched = {};
+  new Set([...Object.keys(remoteSched), ...Object.keys(localSched)]).forEach(day => {
+    const others  = (remoteSched[day]  || []).filter(n => !managedSet.has(n)); // 他店舗スタッフ
+    const managed = (localSched[day]   || []).filter(n =>  managedSet.has(n)); // 担当スタッフ
+    const merged  = [...others, ...managed];
+    if (merged.length > 0) mergedSched[day] = merged;
   });
-  const ssched = getSched(y, m);
-  const hasData = Object.keys(ssched).length > 0 || Object.keys(sreq).length > 0;
+
+  // schedTimes
+  const mergedSchedTimes = {};
+  new Set([...Object.keys(remoteSchedTimes), ...Object.keys(localSchedTimes)]).forEach(day => {
+    const merged = {};
+    Object.entries(remoteSchedTimes[day] || {}).forEach(([n, t]) => { if (!managedSet.has(n)) merged[n] = t; });
+    Object.entries(localSchedTimes[day]  || {}).forEach(([n, t]) => { if ( managedSet.has(n)) merged[n] = t; });
+    if (Object.keys(merged).length > 0) mergedSchedTimes[day] = merged;
+  });
+
+  // schedStores
+  const mergedSchedStores = {};
+  new Set([...Object.keys(remoteSchedStores), ...Object.keys(localSchedStores)]).forEach(day => {
+    const merged = {};
+    Object.entries(remoteSchedStores[day] || {}).forEach(([n, s]) => { if (!managedSet.has(n)) merged[n] = s; });
+    Object.entries(localSchedStores[day]  || {}).forEach(([n, s]) => { if ( managedSet.has(n)) merged[n] = s; });
+    if (Object.keys(merged).length > 0) mergedSchedStores[day] = merged;
+  });
+
+  const ssub = {};
+  getAllMembers().forEach(name => { if (isSubmitted(y, m, name)) ssub[name] = '1'; });
+
+  const hasData = Object.keys(mergedSched).length > 0 || Object.keys(sreq).length > 0;
   if (!hasData) return;
+
   const payload = {
-    ssched,
+    ssched:        mergedSched,
     sreq,
-    ssched_times:  getSchedTimes(y, m),
-    ssched_stores: getSchedStores(y, m),
-    spub:          isPublished(y, m) ? '1' : null,
+    ssched_times:  mergedSchedTimes,
+    ssched_stores: mergedSchedStores,
+    spub:          isPublished(y, m) ? '1' : (remoteData.spub || null), // 公開済みなら保持
     ssub,
   };
   const { error } = await sb.from('sales_data').upsert({
