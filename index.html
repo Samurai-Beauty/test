@@ -783,6 +783,7 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn-secondary" onclick="applyRequestsToSchedule()" style="font-size:13px;padding:8px 16px">📋 希望を反映</button>
               <button class="btn-primary" onclick="doPublishShift()">シフトを公開する</button>
+              <button id="btn-force-may2026" onclick="forceSaveMay2026()" style="display:none;font-size:12px;padding:8px 14px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer">🔄 5月シフトを復元</button>
             </div>
           </div>
           <div class="card">
@@ -3385,6 +3386,11 @@ function submitShiftRequest() {
 function renderShiftManage() {
   const { y, m } = shiftManageMonth;
   document.getElementById('shiftManageLabel').textContent = fmtMonth(y, m);
+  // 5月2026シフト復元ボタン（honsha管理者 + 対象月のみ表示）
+  const btnForce = document.getElementById('btn-force-may2026');
+  if (btnForce) {
+    btnForce.style.display = (currentStore === 'honsha' && y === 2026 && m === 5) ? 'inline-block' : 'none';
+  }
   if (shiftManageTab === 'requests') {
     document.getElementById('manageReqContent').style.display = 'block';
     document.getElementById('manageSchedContent').style.display = 'none';
@@ -3816,6 +3822,127 @@ function doPublishShift() {
   saveShiftToSupabase(y, m).catch(e => console.error('公開保存エラー:', e));
   renderShiftManage();
   alert('シフトを公開しました！スタッフがシフト閲覧で確認できます。');
+}
+
+async function forceSaveMay2026() {
+  if (!confirm('スクリーンショットに基づき5月2026年のシフトを復元してSupabaseに保存します。よろしいですか？')) return;
+  const y = 2026, m = 5;
+  const ym = '2026-05';
+  const storeKey = `shift_${ym}`;
+
+  const ssched = {
+    '1':  ['矢澤南奈','清瀬陽香','沖中真奈','三浦さら'],
+    '2':  ['清瀬陽香','矢澤南奈','沖中真奈'],
+    '3':  ['沖中真奈','三浦さら'],
+    '4':  ['岡部実結','三浦さら'],
+    '5':  ['岡部実結'],
+    '6':  ['沖中真奈','岡部実結'],
+    '7':  ['矢澤南奈','岡部実結','三浦さら'],
+    '8':  ['矢澤南奈','清瀬陽香','沖中真奈','三浦さら'],
+    '9':  ['清瀬陽香','矢澤南奈','岡部実結','三浦さら'],
+    '10': ['岡部実結','沖中真奈','三浦さら'],
+    '11': ['沖中真奈','矢澤南奈','岡部実結','三浦さら'],
+    '12': ['矢澤南奈','沖中真奈','三浦さら'],
+    '13': ['清瀬陽香','沖中真奈','三浦さら'],
+    '14': ['清瀬陽香','沖中真奈','三浦さら'],
+    '15': ['清瀬陽香','矢澤南奈','岡部実結','三浦さら'],
+    '16': ['矢澤南奈','沖中真奈'],
+    '17': ['岡部実結'],
+    '18': ['沖中真奈','矢澤南奈','岡部実結'],
+    '19': ['清瀬陽香','小川真央','沖中真奈','三浦さら'],
+    '20': ['清瀬陽香','矢澤南奈','岡部実結','三浦さら'],
+    '21': ['矢澤南奈','清瀬陽香','沖中真奈','三浦さら'],
+    '22': ['清瀬陽香','矢澤南奈','岡部実結'],
+    '23': ['清瀬陽香','矢澤南奈','沖中真奈','岡部実結'],
+    '24': ['岡部実結','沖中真奈'],
+    '25': ['矢澤南奈','清瀬陽香','岡部実結','三浦さら'],
+    '26': ['矢澤南奈','小川真央','清瀬陽香','三浦さら'],
+    '27': ['矢澤南奈','清瀬陽香','沖中真奈','三浦さら'],
+    '28': ['矢澤南奈','清瀬陽香','沖中真奈','三浦さら'],
+    '29': ['清瀬陽香','矢澤南奈','岡部実結'],
+    '30': ['清瀬陽香','矢澤南奈','沖中真奈','三浦さら'],
+    '31': ['岡部実結','沖中真奈','三浦さら'],
+  };
+  const ssched_times = {
+    '1':  {'矢澤南奈':'early','清瀬陽香':'late','沖中真奈':'early','三浦さら':'late'},
+    '2':  {'清瀬陽香':'h11-17','矢澤南奈':'late','沖中真奈':'h11-17'},
+    '3':  {'沖中真奈':'h11-17','三浦さら':'late'},
+    '4':  {'岡部実結':'h11-17','三浦さら':'late'},
+    '5':  {'岡部実結':'h11-17'},
+    '6':  {'沖中真奈':'h11-17','岡部実結':'h11-17'},
+    '7':  {'矢澤南奈':'early','岡部実結':'early','三浦さら':'late'},
+    '8':  {'矢澤南奈':'early','清瀬陽香':'late','沖中真奈':'early','三浦さら':'late'},
+    '9':  {'清瀬陽香':'h11-17','矢澤南奈':'late','岡部実結':'h11-17','三浦さら':'late'},
+    '10': {'岡部実結':'late','沖中真奈':'h11-17','三浦さら':'late'},
+    '11': {'沖中真奈':'early','矢澤南奈':'late','岡部実結':'early','三浦さら':'late'},
+    '12': {'矢澤南奈':'early','沖中真奈':'early','三浦さら':'late'},
+    '13': {'清瀬陽香':'early','沖中真奈':'early','三浦さら':'late'},
+    '14': {'清瀬陽香':'early','沖中真奈':'early','三浦さら':'late'},
+    '15': {'清瀬陽香':'early','矢澤南奈':'late','岡部実結':'early','三浦さら':'late'},
+    '16': {'矢澤南奈':'late','沖中真奈':'h11-17'},
+    '17': {'岡部実結':'h11-17'},
+    '18': {'沖中真奈':'early','矢澤南奈':'late','岡部実結':'early'},
+    '19': {'清瀬陽香':'early','小川真央':'late','沖中真奈':'early','三浦さら':'late'},
+    '20': {'清瀬陽香':'early','矢澤南奈':'early','岡部実結':'early','三浦さら':'late'},
+    '21': {'矢澤南奈':'early','清瀬陽香':'early','沖中真奈':'early','三浦さら':'late'},
+    '22': {'清瀬陽香':'early','矢澤南奈':'late','岡部実結':'early'},
+    '23': {'清瀬陽香':'h11-17','矢澤南奈':'late','沖中真奈':'h11-17','岡部実結':'late'},
+    '24': {'岡部実結':'h11-17','沖中真奈':'h11-17'},
+    '25': {'矢澤南奈':'early','清瀬陽香':'early','岡部実結':'early','三浦さら':'late'},
+    '26': {'矢澤南奈':'early','小川真央':'late','清瀬陽香':'early','三浦さら':'late'},
+    '27': {'矢澤南奈':'early','清瀬陽香':'early','沖中真奈':'early','三浦さら':'late'},
+    '28': {'矢澤南奈':'early','清瀬陽香':'early','沖中真奈':'early','三浦さら':'late'},
+    '29': {'清瀬陽香':'early','矢澤南奈':'late','岡部実結':'early'},
+    '30': {'清瀬陽香':'h11-17','矢澤南奈':'late','沖中真奈':'h11-17','三浦さら':'late'},
+    '31': {'岡部実結':'late','沖中真奈':'h11-17','三浦さら':'late'},
+  };
+  // クロス店舗配置のみ記録（デフォルト店舗と異なる場合のみ）
+  const ssched_stores = {
+    '6':  {'沖中真奈':'nishishinjuku'},
+    '10': {'岡部実結':'nishishinjuku'},
+    '11': {'沖中真奈':'nishishinjuku'},
+    '18': {'沖中真奈':'nishishinjuku'},
+    '24': {'岡部実結':'nishishinjuku'},
+    '26': {'清瀬陽香':'sanchome'},
+    '31': {'岡部実結':'nishishinjuku'},
+  };
+
+  // localStorage に保存
+  localStorage.setItem(shiftKey('ssched',       y, m), JSON.stringify(ssched));
+  localStorage.setItem(shiftKey('ssched_times', y, m), JSON.stringify(ssched_times));
+  localStorage.setItem(shiftKey('ssched_stores',y, m), JSON.stringify(ssched_stores));
+  localStorage.setItem(shiftKey('spub',         y, m), '1');
+
+  // リモートデータを取得して sreq / ssub を保持しつつ上書き保存
+  try {
+    const { data: existing } = await sb.from('sales_data')
+      .select('data_json').eq('store_key', storeKey).maybeSingle();
+    const remoteData = existing?.data_json || {};
+    const ssub = {};
+    getAllMembers().forEach(name => { if (isSubmitted(y, m, name)) ssub[name] = '1'; });
+    const payload = {
+      ssched,
+      sreq:          remoteData.sreq  || {},
+      ssched_times,
+      ssched_stores,
+      spub:          '1',
+      ssub:          { ...(remoteData.ssub || {}), ...ssub },
+    };
+    const { error } = await sb.from('sales_data').upsert({
+      store_key:   storeKey,
+      filename:    `${storeKey}.json`,
+      data_json:   payload,
+      uploaded_at: new Date().toISOString(),
+      uploaded_by: currentUser || '',
+    }, { onConflict: 'store_key' });
+    if (error) throw error;
+    alert('5月シフトをSupabaseに復元しました！');
+  } catch (e) {
+    console.error('forceSaveMay2026 エラー:', e);
+    alert('Supabase保存に失敗しました: ' + e.message);
+    return;
+  }
+  renderShiftManage();
 }
 
 // ========================================
