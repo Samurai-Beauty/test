@@ -4548,6 +4548,11 @@ async function uploadPhoto() {
     document.getElementById('photoCaption').value = '';
     loadPhotoGallery(currentPhotoFolder);
     setTimeout(() => { msgEl.textContent = ''; }, 3000);
+
+    // Google Drive にもバックアップ保存（失敗してもユーザーには影響しない）
+    _backupToGoogleDrive(file, currentPhotoFolder)
+      .then(() => console.log('Google Drive バックアップ完了'))
+      .catch(e => console.warn('Google Drive バックアップ失敗（無視）:', e.message));
   } catch(err) {
     console.error('uploadPhoto error:', err);
     msgEl.style.color = '#e74c3c';
@@ -4555,6 +4560,24 @@ async function uploadPhoto() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// Google Drive へのバックアップ保存（Supabase 保存成功後に非同期実行）
+async function _backupToGoogleDrive(file, folder) {
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const res = await fetch(GAS_UPLOAD_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body:    JSON.stringify({ fileName: file.name, mimeType: file.type, fileData: base64, folder }),
+  });
+  const text   = await res.text();
+  const result = JSON.parse(text);
+  if (!result.success) throw new Error(result.error || 'Drive保存失敗');
 }
 
 async function deletePhoto(id) {
