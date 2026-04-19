@@ -106,3 +106,36 @@ CREATE INDEX IF NOT EXISTS idx_photos_folder ON photos (folder, uploaded_at DESC
 -- 確認クエリ
 -- SELECT * FROM photos ORDER BY uploaded_at DESC LIMIT 20;
 
+-- ============================================================
+-- Supabase Storage バケット（フォトギャラリー用）
+-- ※ SQL Editor ではなく Supabase ダッシュボードの Storage から
+--   「photos」バケットを作成してもOKです
+-- ============================================================
+
+-- Storage バケット作成（public = 認証なしで画像URLにアクセス可）
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'photos',
+  'photos',
+  true,
+  10485760,  -- 10MB
+  ARRAY['image/jpeg','image/png','image/gif','image/webp','image/heic']
+)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Storage オブジェクトの RLS ポリシー
+-- SELECT（公開読み取り）
+DROP POLICY IF EXISTS "photos_public_select" ON storage.objects;
+CREATE POLICY "photos_public_select" ON storage.objects
+  FOR SELECT TO anon USING (bucket_id = 'photos');
+
+-- INSERT（アップロード許可）
+DROP POLICY IF EXISTS "photos_anon_insert" ON storage.objects;
+CREATE POLICY "photos_anon_insert" ON storage.objects
+  FOR INSERT TO anon WITH CHECK (bucket_id = 'photos');
+
+-- DELETE（削除許可）
+DROP POLICY IF EXISTS "photos_anon_delete" ON storage.objects;
+CREATE POLICY "photos_anon_delete" ON storage.objects
+  FOR DELETE TO anon USING (bucket_id = 'photos');
+

@@ -4515,47 +4515,31 @@ async function uploadPhoto() {
   msgEl.textContent = 'アップロード中... しばらくお待ちください';
 
   try {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = e => resolve(e.target.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    // Supabase Storage に直接アップロード（GAS不要）
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const path = `${currentPhotoFolder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
-    // GAS へ POST（Content-Type: text/plain でプリフライト回避）
-    let gasRes;
-    try {
-      gasRes = await fetch(GAS_UPLOAD_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileData: base64, folder: currentPhotoFolder })
-      });
-    } catch(fetchErr) {
-      throw new Error('GASへの接続失敗。ネットワークを確認してください。');
-    }
+    const { error: upErr } = await sb.storage
+      .from('photos')
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (upErr) throw new Error('Storage保存失敗: ' + upErr.message);
 
-    // GAS は必ず200を返すが、中身がJSONでない場合（エラーHTMLなど）がある
-    const rawText = await gasRes.text();
-    let result;
-    try {
-      result = JSON.parse(rawText);
-    } catch(e) {
-      console.error('GAS response (non-JSON):', rawText.slice(0, 500));
-      throw new Error('GASの応答が不正です。デプロイ設定を確認してください。');
-    }
-    if (!result.success) throw new Error(result.error || 'Googleドライブへの保存に失敗しました');
+    // 公開URLを取得
+    const { data: urlData } = sb.storage.from('photos').getPublicUrl(path);
+    const publicUrl = urlData.publicUrl;
 
+    // メタデータをDBに保存
     const caption = document.getElementById('photoCaption').value.trim();
-    const { error } = await sb.from('photos').insert({
+    const { error: dbErr } = await sb.from('photos').insert({
       folder:      currentPhotoFolder,
-      file_name:   result.fileName,
-      file_id:     result.fileId,
-      thumb_url:   result.thumbUrl,
+      file_name:   file.name,
+      file_id:     path,
+      thumb_url:   publicUrl,
       uploaded_by: currentUser,
       store_key:   currentStore,
-      caption:     caption || null
+      caption:     caption || null,
     });
-    if (error) throw new Error('DB保存失敗: ' + error.message);
+    if (dbErr) throw new Error('DB保存失敗: ' + dbErr.message);
 
     msgEl.style.color = '#27ae60';
     msgEl.textContent = 'アップロード完了！';
@@ -4574,7 +4558,12 @@ async function uploadPhoto() {
 }
 
 async function deletePhoto(id) {
-  if (!confirm('この写真を削除しますか？\n※Googleドライブ上のファイルは残ります')) return;
+  if (!confirm('この写真を削除しますか？')) return;
+  // Storage からもファイルを削除
+  const { data: rec } = await sb.from('photos').select('file_id').eq('id', id).maybeSingle();
+  if (rec?.file_id) {
+    await sb.storage.from('photos').remove([rec.file_id]);
+  }
   const { error } = await sb.from('photos').delete().eq('id', id);
   if (error) { alert('削除失敗: ' + error.message); return; }
   loadPhotoGallery(currentPhotoFolder);
@@ -4583,9 +4572,9 @@ async function deletePhoto(id) {
 function openPhotoModal(thumbUrl, fileId, caption) {
   const existing = document.getElementById('photoViewModal');
   if (existing) existing.remove();
-  const fullUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
-  // Drive thumbnail URLのサイズパラメータを大きくする（どの形式でも対応）
-  const largeThumb = thumbUrl.replace(/sz=w\d+/, 'sz=w1200');
+  // Supabase Storage URL はそのまま使用（サイズ変換不要）
+  const fullUrl    = thumbUrl;
+  const largeThumb = thumbUrl;
   const modal = document.createElement('div');
   modal.id = 'photoViewModal';
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
@@ -4599,7 +4588,7 @@ function openPhotoModal(thumbUrl, fileId, caption) {
     </div>
     ${caption ? `<div style="color:#fff;font-size:14px;margin-top:12px;text-align:center;max-width:400px">${caption}</div>` : ''}
     <a href="${fullUrl}" target="_blank"
-      style="color:#7ec8f7;font-size:13px;margin-top:10px;text-decoration:none">Googleドライブで開く ↗</a>`;
+      style="color:#7ec8f7;font-size:13px;margin-top:10px;text-decoration:none">画像を開く ↗</a>`;
   document.body.appendChild(modal);
 }
 
