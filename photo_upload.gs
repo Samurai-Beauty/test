@@ -10,9 +10,9 @@
 // Google Drive フォルダID（各フォルダの URL 末尾の文字列）
 // 例: https://drive.google.com/drive/folders/XXXX → XXXX
 const FOLDER_IDS = {
-  eyebrow: '1dSmKijEYpT1nOixWd9h2LZeG5sCa0VxR', // 眉毛フォルダID
-  nail:    '1tPNH-1YHBDdqPH1pZILT_N73t0P7fxp2', // メンズネイルフォルダID
-  other:   '1t-PQz3mVDfBfm5CqxSxSk2KFBuVHKaHg', // その他フォルダID
+  eyebrow: '1aNAMajwQ-XwgsK5Lb10A5EOZAzYvrU9y', // 眉毛フォルダID
+  nail:    '1X-Uq76BXN5O0RfAi7rGf3n7A3iQOn_ox', // メンズネイルフォルダID
+  other:   '1nuzQ792wa4RZnb3cotfrLa8hLKoKGvKn',  // その他フォルダID
 };
 
 function doPost(e) {
