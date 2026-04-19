@@ -61,3 +61,48 @@ CREATE INDEX IF NOT EXISTS idx_reservations_store ON reservations (store_key, re
 
 -- 確認クエリ（実行後にテーブル内容を確認）
 -- SELECT * FROM reservations ORDER BY created_at DESC LIMIT 20;
+
+-- ============================================================
+-- photos テーブル（フォトギャラリー用）
+-- ============================================================
+
+-- 8. photos テーブル作成
+CREATE TABLE IF NOT EXISTS photos (
+  id          BIGSERIAL PRIMARY KEY,
+  folder      TEXT NOT NULL,       -- eyebrow / nail / other
+  file_name   TEXT,
+  file_id     TEXT,                -- Google Drive ファイルID
+  thumb_url   TEXT,                -- サムネイルURL
+  caption     TEXT,
+  uploaded_by TEXT,
+  store_key   TEXT,
+  uploaded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. photos テーブルに RLS を有効化
+ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
+
+-- 10. photos SELECT ポリシー（全ユーザーが閲覧可）
+DROP POLICY IF EXISTS "allow_anon_select_photos" ON photos;
+CREATE POLICY "allow_anon_select_photos" ON photos
+  FOR SELECT TO anon
+  USING (true);
+
+-- 11. photos INSERT ポリシー（anon キーでの書き込みを許可）
+DROP POLICY IF EXISTS "allow_anon_insert_photos" ON photos;
+CREATE POLICY "allow_anon_insert_photos" ON photos
+  FOR INSERT TO anon
+  WITH CHECK (true);
+
+-- 12. photos DELETE ポリシー（管理者が削除できるよう許可）
+DROP POLICY IF EXISTS "allow_anon_delete_photos" ON photos;
+CREATE POLICY "allow_anon_delete_photos" ON photos
+  FOR DELETE TO anon
+  USING (true);
+
+-- 13. インデックス
+CREATE INDEX IF NOT EXISTS idx_photos_folder ON photos (folder, uploaded_at DESC);
+
+-- 確認クエリ
+-- SELECT * FROM photos ORDER BY uploaded_at DESC LIMIT 20;
+
