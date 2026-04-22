@@ -3042,7 +3042,6 @@ function isPublished(y, m) {
 }
 function markPublished(y, m) {
   localStorage.setItem(shiftKey('spub', y, m), '1');
-  saveShiftToSupabaseDebounced(y, m);
 }
 
 // ========================================
@@ -3831,13 +3830,18 @@ function closeStaffModal(e) {
   }
 }
 
-function doPublishShift() {
+async function doPublishShift() {
   const { y, m } = shiftManageMonth;
   if (!confirm(fmtMonth(y, m) + 'のシフトを公開しますか？')) return;
   markPublished(y, m);
-  saveShiftToSupabase(y, m).catch(e => console.error('公開保存エラー:', e));
-  renderShiftManage();
-  alert('シフトを公開しました！スタッフがシフト閲覧で確認できます。');
+  try {
+    await saveShiftToSupabase(y, m);
+    renderShiftManage();
+    alert('シフトを公開しました！スタッフがシフト閲覧で確認できます。');
+  } catch(e) {
+    console.error('公開保存エラー:', e);
+    alert('保存中にエラーが発生しました。もう一度お試しください。');
+  }
 }
 
 // 自動復元フラグ（このバージョンが保存されていれば再実行しない）
