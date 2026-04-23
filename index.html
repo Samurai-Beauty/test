@@ -3924,22 +3924,58 @@ async function _execRestoreMay2026(silent = false) {
     '26': {'清瀬陽香':'sanchome'},
   };
 
-  localStorage.setItem(shiftKey('ssched',       y, m), JSON.stringify(ssched));
-  localStorage.setItem(shiftKey('ssched_times', y, m), JSON.stringify(ssched_times));
-  localStorage.setItem(shiftKey('ssched_stores',y, m), JSON.stringify(ssched_stores));
-  localStorage.setItem(shiftKey('spub',         y, m), '1');
+  localStorage.setItem(shiftKey('spub', y, m), '1');
 
   try {
     const { data: existing } = await sb.from('sales_data')
       .select('data_json').eq('store_key', storeKey).maybeSingle();
     const remoteData = existing?.data_json || {};
+    const remoteSched       = remoteData.ssched        || {};
+    const remoteSchedTimes  = remoteData.ssched_times  || {};
+    const remoteSchedStores = remoteData.ssched_stores || {};
+
+    // シードにいないスタッフ（高橋里奈など後から追加されたメンバー）のデータを保持するマージ
+    const seedStaffSet = new Set(Object.values(ssched).flat());
+
+    // ssched マージ：シード優先 + シード外スタッフをリモートから保持
+    const mergedSched = {};
+    new Set([...Object.keys(remoteSched), ...Object.keys(ssched)]).forEach(day => {
+      const seedForDay   = ssched[day] || [];
+      const remoteExtra  = (remoteSched[day] || []).filter(n => !seedStaffSet.has(n));
+      const merged = [...seedForDay, ...remoteExtra];
+      if (merged.length > 0) mergedSched[day] = merged;
+    });
+
+    // ssched_times マージ：シード優先 + シード外スタッフをリモートから保持
+    const mergedSchedTimes = {};
+    new Set([...Object.keys(remoteSchedTimes), ...Object.keys(ssched_times)]).forEach(day => {
+      const merged = {};
+      Object.entries(remoteSchedTimes[day] || {}).forEach(([n, t]) => { if (!seedStaffSet.has(n)) merged[n] = t; });
+      Object.entries(ssched_times[day]     || {}).forEach(([n, t]) => { merged[n] = t; }); // シードが上書き
+      if (Object.keys(merged).length > 0) mergedSchedTimes[day] = merged;
+    });
+
+    // ssched_stores マージ：シードスタッフの誤割り当て修正を維持しつつ、シード外スタッフのリモートを保持
+    const mergedSchedStores = {};
+    new Set([...Object.keys(remoteSchedStores), ...Object.keys(ssched_stores)]).forEach(day => {
+      const merged = {};
+      Object.entries(remoteSchedStores[day] || {}).forEach(([n, s]) => { if (!seedStaffSet.has(n)) merged[n] = s; });
+      Object.entries(ssched_stores[day]     || {}).forEach(([n, s]) => { merged[n] = s; }); // シードが上書き
+      if (Object.keys(merged).length > 0) mergedSchedStores[day] = merged;
+    });
+
+    // ローカルストレージも更新（マージ後データで）
+    localStorage.setItem(shiftKey('ssched',        y, m), JSON.stringify(mergedSched));
+    localStorage.setItem(shiftKey('ssched_times',  y, m), JSON.stringify(mergedSchedTimes));
+    localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(mergedSchedStores));
+
     const ssub = {};
     getAllMembers().forEach(name => { if (isSubmitted(y, m, name)) ssub[name] = '1'; });
     const payload = {
-      ssched,
+      ssched:        mergedSched,
       sreq:          remoteData.sreq  || {},
-      ssched_times,
-      ssched_stores,
+      ssched_times:  mergedSchedTimes,
+      ssched_stores: mergedSchedStores,
       spub:          '1',
       ssub:          { ...(remoteData.ssub || {}), ...ssub },
     };
