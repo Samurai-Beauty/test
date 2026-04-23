@@ -3845,7 +3845,7 @@ async function doPublishShift() {
 }
 
 // 自動復元フラグ（このバージョンが保存されていれば再実行しない）
-const MAY2026_RESTORE_VER = 'tatsuomi-v1';
+const MAY2026_RESTORE_VER = 'tatsuomi-v2';
 
 async function _execRestoreMay2026(silent = false) {
   const y = 2026, m = 5;
@@ -3919,13 +3919,7 @@ async function _execRestoreMay2026(silent = false) {
     '31': {'岡部実結':'late','沖中真奈':'h11-17','三浦さら':'late'},
   };
   const ssched_stores = {
-    '6':  {'沖中真奈':'nishishinjuku'},
-    '10': {'岡部実結':'nishishinjuku'},
-    '11': {'沖中真奈':'nishishinjuku'},
-    '18': {'沖中真奈':'nishishinjuku'},
-    '24': {'岡部実結':'nishishinjuku'},
     '26': {'清瀬陽香':'sanchome'},
-    '31': {'岡部実結':'nishishinjuku'},
   };
 
   localStorage.setItem(shiftKey('ssched',       y, m), JSON.stringify(ssched));
