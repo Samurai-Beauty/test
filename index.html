@@ -2026,7 +2026,7 @@ function renderStylistManage() {
     if (members.length === 0 && storeKey !== 'shibuya') return;
     html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:#0f3460;margin-bottom:8px">${STORE_LABELS[storeKey]}</div>`;
     const storeCustom = customStylists.filter(s => s.store === storeKey);
-    const allM = [...members, ...storeCustom.map(s => s.name)];
+    const allM = [...members, ...storeCustom.map(s => s.name).filter(n => !members.includes(n))];
     if (allM.length === 0) { html += '<div style="color:#aaa;font-size:13px">メンバーなし</div>'; }
     allM.forEach(name => {
       const isCustom = customStylists.some(s => s.name === name);
@@ -4795,11 +4795,13 @@ function restoreLoginForm() {
   return false; // 店舗・名前のみ復元、自動ログインしない
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   // Enter キーでログイン
   document.getElementById('loginPass').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   });
+  // カスタムスタイリストをSupabaseから先読み（ログイン画面の名前リストに反映させるため）
+  await loadCustomStylists();
   // 自動ログイン（保存済み認証情報があれば）
   if (restoreLoginForm()) {
     doLogin();
