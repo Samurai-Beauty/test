@@ -3067,7 +3067,10 @@ async function saveShiftToSupabase(y, m) {
   // ── sreq マージ（リモート優先 ── スタイリスト提出データを保護）
   const remoteSreq = remoteData.sreq || {};
   const localSreq  = getAllReqs(y, m);
-  const sreq = { ...localSreq, ...remoteSreq };
+  // sreq はスタッフ提出データのため、リモートを正として自分自身の分のみローカルで上書き
+  // こうすることで管理者保存時に他スタッフの提出データを古いローカルで壊さない
+  const sreq = { ...remoteSreq };
+  if (localSreq[currentUser]) sreq[currentUser] = localSreq[currentUser];
 
   // ── ssched / schedTimes / schedStores マージ ──────────────────
   // 複数管理者アカウントが同一レコードを上書きし合わないよう、
@@ -3255,9 +3258,8 @@ function renderShiftRequest() {
   badge.className = 'submit-badge ' + (submitted ? 'done' : 'pending');
 
   // 提出済みの場合はバックグラウンドでSupabaseに再同期（他スタッフのデータを保護しつつ）
-  if (submitted) {
-    saveMyReqMerged(y, m).catch(() => {});
-  }
+  // ※ 画面表示のたびには呼ばない（古いリモートデータでローカルを上書きするリスクがあるため）
+  // 再同期は saveMyReq / markSubmitted のタイミングのみに限定
   // 期限ラベル
   const dlLabel = document.getElementById('shiftReqDeadlineLabel');
   if (locked) {
