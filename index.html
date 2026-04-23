@@ -3998,11 +3998,8 @@ async function _execRestoreMay2026(silent = false) {
 
 // honsha管理者ログイン時に一度だけ自動復元（バージョン違いなら再実行）
 async function _autoRestoreMay2026IfNeeded() {
-  if (currentStore !== 'honsha') return;
-  if (localStorage.getItem('may2026_restore_version') === MAY2026_RESTORE_VER) return;
-  console.log('May2026 auto-restoring shift data...');
-  await _execRestoreMay2026(true);
-  renderShiftManage();
+  // 自動復元は無効化（手動で「5月シフトを復元」ボタンを使用すること）
+  return;
 }
 
 async function forceSaveMay2026() {
