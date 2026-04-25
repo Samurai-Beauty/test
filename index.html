@@ -2288,7 +2288,7 @@ function showSection(name) {
   document.getElementById('nav-' + name).classList.add('active');
   if (name === 'shift-request') renderShiftRequest();
   else if (name === 'shift-manage') { updateManageStoreTabs(); renderShiftManage(); }
-  else if (name === 'shift-view') renderShiftView();
+  else if (name === 'shift-view') { renderShiftView(); loadShiftsFromSupabase(); }
   else if (name === 'stylist-manage') {
     // FCオーナーは追加フォームの配属店舗を自店舗に固定
     if (isFCOwner()) {
