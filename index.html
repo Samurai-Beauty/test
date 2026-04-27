@@ -3085,29 +3085,44 @@ async function saveShiftToSupabase(y, m) {
   const localSchedStores = getSchedStores(y, m);
 
   // ssched
+  // 「ローカルにその日のデータがある場合」のみローカル優先。
+  // ない場合はリモートを保持（高橋里奈など後から追加されたスタッフのデータ消失を防止）
   const mergedSched = {};
   new Set([...Object.keys(remoteSched), ...Object.keys(localSched)]).forEach(day => {
-    const others  = (remoteSched[day]  || []).filter(n => !managedSet.has(n)); // 他店舗スタッフ
-    const managed = (localSched[day]   || []).filter(n =>  managedSet.has(n)); // 担当スタッフ
-    const merged  = [...others, ...managed];
+    const dayInLocal = day in localSched;
+    const others  = (remoteSched[day] || []).filter(n => !managedSet.has(n));
+    const managed = dayInLocal
+      ? (localSched[day] || []).filter(n => managedSet.has(n))  // ローカルが正
+      : (remoteSched[day] || []).filter(n => managedSet.has(n)); // ローカル未記録→リモートを保持
+    const merged = [...others, ...managed];
     if (merged.length > 0) mergedSched[day] = merged;
   });
 
   // schedTimes
   const mergedSchedTimes = {};
   new Set([...Object.keys(remoteSchedTimes), ...Object.keys(localSchedTimes)]).forEach(day => {
+    const dayInLocal = day in localSchedTimes;
     const merged = {};
-    Object.entries(remoteSchedTimes[day] || {}).forEach(([n, t]) => { if (!managedSet.has(n)) merged[n] = t; });
-    Object.entries(localSchedTimes[day]  || {}).forEach(([n, t]) => { if ( managedSet.has(n)) merged[n] = t; });
+    if (dayInLocal) {
+      Object.entries(remoteSchedTimes[day] || {}).forEach(([n, t]) => { if (!managedSet.has(n)) merged[n] = t; });
+      Object.entries(localSchedTimes[day]  || {}).forEach(([n, t]) => { if ( managedSet.has(n)) merged[n] = t; });
+    } else {
+      Object.entries(remoteSchedTimes[day] || {}).forEach(([n, t]) => { merged[n] = t; });
+    }
     if (Object.keys(merged).length > 0) mergedSchedTimes[day] = merged;
   });
 
   // schedStores
   const mergedSchedStores = {};
   new Set([...Object.keys(remoteSchedStores), ...Object.keys(localSchedStores)]).forEach(day => {
+    const dayInLocal = day in localSchedStores;
     const merged = {};
-    Object.entries(remoteSchedStores[day] || {}).forEach(([n, s]) => { if (!managedSet.has(n)) merged[n] = s; });
-    Object.entries(localSchedStores[day]  || {}).forEach(([n, s]) => { if ( managedSet.has(n)) merged[n] = s; });
+    if (dayInLocal) {
+      Object.entries(remoteSchedStores[day] || {}).forEach(([n, s]) => { if (!managedSet.has(n)) merged[n] = s; });
+      Object.entries(localSchedStores[day]  || {}).forEach(([n, s]) => { if ( managedSet.has(n)) merged[n] = s; });
+    } else {
+      Object.entries(remoteSchedStores[day] || {}).forEach(([n, s]) => { merged[n] = s; });
+    }
     if (Object.keys(merged).length > 0) mergedSchedStores[day] = merged;
   });
 
@@ -3195,8 +3210,9 @@ async function loadShiftsFromSupabase() {
   }
 }
 
-// ログイン時：既存のlocalShiftデータをSupabaseに一括アップロード（初回マイグレーション）
+// ログイン時：既存のlocalShiftデータをSupabaseに一括アップロード（デバイス初回のみ）
 async function migrateLocalShiftsToSupabase() {
+  if (localStorage.getItem('_shiftsMigratedToCloudV1')) return; // このデバイスでは既に実行済み
   const months = new Set();
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -3209,6 +3225,7 @@ async function migrateLocalShiftsToSupabase() {
     await saveShiftToSupabase(y, mo);
   }
   if (months.size > 0) console.log(`シフトデータ ${months.size}ヶ月分をSupabaseに移行しました`);
+  localStorage.setItem('_shiftsMigratedToCloudV1', '1');
 }
 
 // ========================================
