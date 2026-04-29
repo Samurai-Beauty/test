@@ -832,6 +832,13 @@
       <!-- ====== シフト交換 ====== -->
       <div class="section" id="section-shift-swap">
         <div class="section-title">🔄 シフト交換</div>
+        <div class="shift-status-bar" style="margin-bottom:12px">
+          <div class="month-nav">
+            <button onclick="swapPrev()">&#8249;</button>
+            <span class="month-label" id="swapMonthLabel"></span>
+            <button onclick="swapNext()">&#8250;</button>
+          </div>
+        </div>
         <div id="swapContent" style="padding-bottom:24px">
           <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
         </div>
@@ -1299,6 +1306,7 @@ function shiftLong(key) {
 let shiftReqMonth    = { y: 0, m: 0 };
 let shiftManageMonth = { y: 0, m: 0 };
 let shiftViewMonth   = { y: 0, m: 0 };
+let swapMonth        = { y: 0, m: 0 };
 let shiftViewStores = ['nishishinjuku', 'sanchome', 'shibuya']; // 複数選択可（本社）
 function getAllowedViewStores() {
   if (currentStore === 'honsha') return ['nishishinjuku', 'sanchome', 'shibuya'];
@@ -2095,6 +2103,7 @@ function doLogin() {
   shiftReqMonth = { y: _ry, m: _rm };
   shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
+  swapMonth        = { y: _ry, m: _rm }; // シフト提出と同じ月をデフォルト
   shiftViewStores  = getAllowedViewStores();
   const isHonsha = store === 'honsha';
   const isMgr = isHonsha || isManagerRole(name, store);
@@ -4187,6 +4196,16 @@ function shiftViewNext() {
   if (shiftViewMonth.m > 12) { shiftViewMonth.m = 1; shiftViewMonth.y++; }
   renderShiftView();
 }
+function swapPrev() {
+  swapMonth.m--;
+  if (swapMonth.m < 1) { swapMonth.m = 12; swapMonth.y--; }
+  renderShiftSwap();
+}
+function swapNext() {
+  swapMonth.m++;
+  if (swapMonth.m > 12) { swapMonth.m = 1; swapMonth.y++; }
+  renderShiftSwap();
+}
 
 // ============================================================
 // シフト交換
@@ -4214,6 +4233,8 @@ const SWAP_STATUS_COLOR = { pending:'#e67e22', approved:'#27ae60', rejected:'#e7
 async function renderShiftSwap() {
   const el = document.getElementById('swapContent');
   if (!el) return;
+  const labelEl = document.getElementById('swapMonthLabel');
+  if (labelEl) labelEl.textContent = fmtMonth(swapMonth.y, swapMonth.m);
   el.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>';
   const isAdmin = currentStore === 'honsha';
 
@@ -4294,7 +4315,7 @@ function _renderSwapStylist(container, allSwaps) {
 }
 
 function _renderSwapForm() {
-  const { y, m } = shiftViewMonth;
+  const { y, m } = swapMonth;
   const pub = isPublished(y, m);
   if (!pub) {
     return `<div class="card"><div class="card-title">🔄 新規交換リクエスト</div>
@@ -4362,7 +4383,7 @@ function updateSwapToDays() {
   if (!toDayEl) return;
   if (!toUser) { toDayEl.innerHTML = '<option value="">先にスタッフを選択</option>'; return; }
 
-  const { y, m } = shiftViewMonth;
+  const { y, m } = swapMonth;
   const sched = getSched(y, m);
   const schedTimes = getSchedTimes(y, m);
   const theirDays = Object.entries(sched)
@@ -4393,7 +4414,7 @@ async function submitSwapRequest() {
   const toDay   = parseInt(toDayEl?.value);
   if (!fromDay || !toUser || !toDay) { alert('すべての項目を選択してください'); return; }
 
-  const { y, m } = shiftViewMonth;
+  const { y, m } = swapMonth;
   const schedTimes = getSchedTimes(y, m);
   const fromTime = (schedTimes[String(fromDay)] || {})[currentUser] || '';
   const toTime   = (schedTimes[String(toDay)]   || {})[toUser]      || '';
