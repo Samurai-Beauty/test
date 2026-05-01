@@ -2944,7 +2944,13 @@ function getShiftHours(key) {
 // ========================================
 // シフト希望 提出期限（前々月末日 23:59）
 // ========================================
+// 個別月の期限上書き（未提出者対応など特例延長用）
+const SHIFT_DEADLINE_OVERRIDES = {
+  '2026-6': new Date(2026, 4, 3, 23, 59, 59, 999), // 6月分は5月3日 23:59 まで延長
+};
 function getShiftDeadline(y, m) {
+  const ovr = SHIFT_DEADLINE_OVERRIDES[`${y}-${m}`];
+  if (ovr) return ovr;
   // 対象月 (y,m) の前々月の末日 23:59:59
   let dm = m - 2, dy = y;
   if (dm <= 0) { dm += 12; dy -= 1; }
