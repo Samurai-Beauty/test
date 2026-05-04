@@ -2944,12 +2944,21 @@ function getShiftHours(key) {
 // ========================================
 // シフト希望 提出期限（前々月末日 23:59）
 // ========================================
-// 個別月の期限上書き（未提出者対応など特例延長用）
+// 個別月の期限上書き（全員向け特例延長）
 const SHIFT_DEADLINE_OVERRIDES = {
   '2026-6': new Date(2026, 4, 3, 23, 59, 59, 999), // 6月分は5月3日 23:59 まで延長
 };
-function getShiftDeadline(y, m) {
-  const ovr = SHIFT_DEADLINE_OVERRIDES[`${y}-${m}`];
+// ユーザー別の期限上書き（特定スタッフのみ個別延長）
+const SHIFT_DEADLINE_USER_OVERRIDES = {
+  '2026-6': {
+    '三浦さら': new Date(2026, 4, 5, 23, 59, 59, 999), // 5月5日 23:59 まで延長
+  },
+};
+function getShiftDeadline(y, m, user) {
+  const key = `${y}-${m}`;
+  const userOvr = user && (SHIFT_DEADLINE_USER_OVERRIDES[key] || {})[user];
+  if (userOvr) return userOvr;
+  const ovr = SHIFT_DEADLINE_OVERRIDES[key];
   if (ovr) return ovr;
   // 対象月 (y,m) の前々月の末日 23:59:59
   let dm = m - 2, dy = y;
@@ -2957,11 +2966,11 @@ function getShiftDeadline(y, m) {
   // new Date(dy, dm, 0) = dmの末日（0=前月最終日）
   return new Date(dy, dm, 0, 23, 59, 59, 999);
 }
-function isShiftDeadlinePassed(y, m) {
-  return new Date() > getShiftDeadline(y, m);
+function isShiftDeadlinePassed(y, m, user) {
+  return new Date() > getShiftDeadline(y, m, user);
 }
-function fmtDeadline(y, m) {
-  const d = getShiftDeadline(y, m);
+function fmtDeadline(y, m, user) {
+  const d = getShiftDeadline(y, m, user);
   return `${d.getMonth() + 1}月${d.getDate()}日 23:59`;
 }
 function getAllReqs(y, m) {
@@ -3284,7 +3293,7 @@ function renderShiftRequest() {
   const { y, m } = shiftReqMonth;
   document.getElementById('shiftReqLabel').textContent = fmtMonth(y, m);
   const submitted = isSubmitted(y, m, currentUser);
-  const locked = isShiftDeadlinePassed(y, m);
+  const locked = isShiftDeadlinePassed(y, m, currentUser);
   const badge = document.getElementById('shiftReqBadge');
   badge.textContent = submitted ? '提出済み' : '未提出';
   badge.className = 'submit-badge ' + (submitted ? 'done' : 'pending');
@@ -3295,10 +3304,10 @@ function renderShiftRequest() {
   // 期限ラベル
   const dlLabel = document.getElementById('shiftReqDeadlineLabel');
   if (locked) {
-    dlLabel.textContent = '提出期限切れ（' + fmtDeadline(y, m) + ' まで）';
+    dlLabel.textContent = '提出期限切れ（' + fmtDeadline(y, m, currentUser) + ' まで）';
     dlLabel.style.color = '#e74c3c';
   } else {
-    dlLabel.textContent = '提出期限：' + fmtDeadline(y, m) + ' まで';
+    dlLabel.textContent = '提出期限：' + fmtDeadline(y, m, currentUser) + ' まで';
     dlLabel.style.color = '#27ae60';
   }
   // 提出ボタン制御
@@ -3361,7 +3370,7 @@ let shiftPickerDay = null;
 
 function openShiftPicker(day) {
   const { y, m } = shiftReqMonth;
-  if (isShiftDeadlinePassed(y, m)) return; // 期限切れは操作不可
+  if (isShiftDeadlinePassed(y, m, currentUser)) return; // 期限切れは操作不可
   const req = getMyReq(y, m);
   const cur = req[String(day)] || '';
   shiftPickerDay = day;
@@ -3416,8 +3425,8 @@ function shiftReqNext() {
 
 function submitShiftRequest() {
   const { y, m } = shiftReqMonth;
-  if (isShiftDeadlinePassed(y, m)) {
-    alert('提出期限（' + fmtDeadline(y, m) + '）を過ぎているため提出できません。');
+  if (isShiftDeadlinePassed(y, m, currentUser)) {
+    alert('提出期限（' + fmtDeadline(y, m, currentUser) + '）を過ぎているため提出できません。');
     return;
   }
   if (isSubmitted(y, m, currentUser)) {
