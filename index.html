@@ -1056,6 +1056,7 @@
             <span class="month-label" id="inflowMonthLabel"></span>
             <button onclick="inflowNext()">&#8250;</button>
           </div>
+          <button onclick="openInflowImport()" style="margin-left:auto;padding:8px 14px;background:#27ae60;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">🤖 Claude.aiから取込</button>
         </div>
         <div id="inflowContent" style="padding-bottom:24px">
           <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
@@ -5061,6 +5062,90 @@ async function renderInflow() {
   el.innerHTML = html;
 }
 
+function openInflowImport() {
+  const { y, m } = inflowMonth;
+  const prompt = `エルメのご新規カルテフォーム（bot_id: aRo9dx, form_id: 201419）の${y}年${m}月の回答を取得してください。
+
+以下のJSON形式のみを返してください（余分な説明は不要）：
+
+{
+  "nishishinjuku": {
+    "new_client": <西新宿小滝橋通り 店 の新規客数（来店店舗フィールドで判別）>,
+    "subscribe": <サブスク契約数（サブスクに申し込みましたか？がはいの件数）>,
+    "line_add": 0
+  },
+  "sanchome": {
+    "new_client": <新宿三丁目 店 の新規客数>,
+    "subscribe": <サブスク契約数>,
+    "line_add": 0
+  },
+  "shibuya": {
+    "new_client": <渋谷東 店 の新規客数>,
+    "subscribe": <サブスク契約数>,
+    "line_add": 0
+  }
+}
+
+対象期間：${y}年${m}月1日〜末日（answered_at で絞り込む）`;
+
+  document.getElementById('inflowPromptTemplate').textContent = prompt;
+  document.getElementById('inflowImportJson').value = '';
+  document.getElementById('inflowImportMsg').textContent = '';
+  document.getElementById('inflowImportModal').style.display = 'block';
+}
+
+function closeInflowImport() {
+  document.getElementById('inflowImportModal').style.display = 'none';
+}
+
+function copyInflowPrompt() {
+  const text = document.getElementById('inflowPromptTemplate').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('コピーしました。Claude.aiに貼り付けてください。');
+  });
+}
+
+async function importInflowFromClaude() {
+  const msg = document.getElementById('inflowImportMsg');
+  const jsonText = document.getElementById('inflowImportJson').value.trim();
+  if (!jsonText) { msg.textContent = 'JSONを貼り付けてください'; msg.style.color = 'red'; return; }
+
+  let parsed;
+  try {
+    const match = jsonText.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('JSONが見つかりません');
+    parsed = JSON.parse(match[0]);
+  } catch (e) {
+    msg.textContent = 'JSONの解析に失敗しました: ' + e.message;
+    msg.style.color = 'red';
+    return;
+  }
+
+  const { y, m } = inflowMonth;
+  msg.textContent = '保存中...';
+  msg.style.color = '#888';
+
+  try {
+    await Promise.all(INFLOW_STORES.map(async store => {
+      const incoming = parsed[store.key];
+      if (!incoming) return;
+      const existing = getInflowData(store.key, y, m);
+      const merged = Object.assign({}, existing);
+      if (incoming.new_client !== undefined) merged.new_client = Number(incoming.new_client) || 0;
+      if (incoming.subscribe  !== undefined) merged.subscribe  = Number(incoming.subscribe)  || 0;
+      if (incoming.line_add   !== undefined && incoming.line_add > 0) merged.line_add = Number(incoming.line_add) || 0;
+      setInflowCache(store.key, y, m, merged);
+      await saveInflowToSupabase(store.key, y, m, merged);
+    }));
+    msg.textContent = '✅ インポート完了！';
+    msg.style.color = 'green';
+    setTimeout(() => { closeInflowImport(); renderInflow(); }, 1200);
+  } catch (e) {
+    msg.textContent = 'エラー: ' + e.message;
+    msg.style.color = 'red';
+  }
+}
+
 async function saveInflowForm() {
   const { y, m } = inflowMonth;
   const canEdit = currentStore === 'honsha' || isFCOwner();
@@ -5087,5 +5172,30 @@ async function saveInflowForm() {
   renderInflow();
 }
 </script>
+<!-- 流入分析 Claude.aiインポートモーダル -->
+<div id="inflowImportModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;padding:16px;box-sizing:border-box;overflow-y:auto">
+  <div style="background:#fff;border-radius:16px;max-width:600px;margin:20px auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">🤖 Claude.aiからデータ取込</div>
+      <button onclick="closeInflowImport()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888">✕</button>
+    </div>
+
+    <div style="background:#f0f4ff;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">① Claude.ai（エルメ接続済み）でこのプロンプトを使用</div>
+      <div id="inflowPromptTemplate" style="font-size:12px;line-height:1.7;white-space:pre-wrap;color:#333;font-family:monospace;background:#fff;border-radius:8px;padding:12px;border:1px solid #ddd;max-height:200px;overflow-y:auto"></div>
+      <button onclick="copyInflowPrompt()" style="margin-top:10px;padding:7px 16px;background:#0f3460;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">📋 プロンプトをコピー</button>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">② Claude.aiの返答JSONをここに貼り付け</div>
+      <textarea id="inflowImportJson" placeholder='{"nishishinjuku":{"new_client":45,"subscribe":12,"line_add":230},...}'
+        style="width:100%;height:140px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+
+    <button onclick="importInflowFromClaude()" style="width:100%;padding:13px;background:#27ae60;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">✅ インポートして保存</button>
+    <div id="inflowImportMsg" style="margin-top:10px;font-size:13px;text-align:center;min-height:18px"></div>
+  </div>
+</div>
+
 </body>
 </html>
