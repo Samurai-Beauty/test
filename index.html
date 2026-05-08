@@ -4929,10 +4929,11 @@ const INFLOW_STORES = [
   { key: 'shibuya',       label: '渋谷東' },
 ];
 const INFLOW_FIELDS = [
-  { key: 'line_add',    label: 'LINE友達追加数', unit: '人', color: '#27ae60' },
   { key: 'new_client',  label: '新規客数',       unit: '人', color: '#2980b9' },
   { key: 'subscribe',   label: 'サブスク契約数', unit: '件', color: '#8e44ad' },
 ];
+// LINE友達は全店舗合計で管理（store_key: inflow_line_${y}_${m}）
+const INFLOW_LINE_KEY = 'line';
 
 let inflowMonth = { y: 0, m: 0 };
 
@@ -4947,8 +4948,19 @@ function setInflowCache(storeKey, y, m, data) {
   localStorage.setItem(inflowKey(storeKey, y, m), JSON.stringify(data));
 }
 
+function getInflowLineData(y, m) {
+  const raw = localStorage.getItem(inflowKey(INFLOW_LINE_KEY, y, m));
+  return raw ? JSON.parse(raw) : {};
+}
+function setInflowLineCache(y, m, data) {
+  localStorage.setItem(inflowKey(INFLOW_LINE_KEY, y, m), JSON.stringify(data));
+}
+
 async function loadInflowFromSupabase(y, m) {
-  const keys = INFLOW_STORES.map(s => inflowKey(s.key, y, m));
+  const keys = [
+    ...INFLOW_STORES.map(s => inflowKey(s.key, y, m)),
+    inflowKey(INFLOW_LINE_KEY, y, m),
+  ];
   const { data, error } = await sb.from('sales_data')
     .select('store_key,data_json')
     .in('store_key', keys);
@@ -4994,17 +5006,45 @@ async function renderInflow() {
     ? INFLOW_STORES
     : INFLOW_STORES.filter(s => getAllowedViewStores().includes(s.key));
 
+  const lineData = getInflowLineData(y, m);
+
   // ── 入力フォーム ──────────────────────────────────────────
   let html = `<div class="card"><div class="card-title">📝 データ入力（${y}年${m}月）</div>`;
 
   if (!canEdit) {
     html += `<p style="color:#aaa;font-size:13px">閲覧のみ可能です</p>`;
   } else {
+    // LINE友達（全店舗合計）
+    html += `<div style="margin-bottom:20px;padding:14px;background:#f0faf4;border-radius:12px;border:1px solid #c3e6cb">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#1a1a2e">📱 LINE友達（全店舗合計）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:#fff;border-radius:10px;padding:10px">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">友達合計数</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" min="0" value="${lineData.line_total ?? ''}"
+              id="inflow_line_total"
+              style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-align:right">
+            <span style="font-size:12px;color:#888">人</span>
+          </div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:10px">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">今月追加数</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" min="0" value="${lineData.line_add ?? ''}"
+              id="inflow_line_add"
+              style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-align:right">
+            <span style="font-size:12px;color:#888">人</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    // 店舗別（新規客数・サブスク）
     editableStores.forEach(store => {
       const data = getInflowData(store.key, y, m);
       html += `<div style="margin-bottom:18px">
         <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">🏪 ${store.label}</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">`;
       INFLOW_FIELDS.forEach(f => {
         const val = data[f.key] ?? '';
         html += `<div style="background:#f8f9fa;border-radius:10px;padding:10px">
@@ -5024,8 +5064,20 @@ async function renderInflow() {
   html += `</div>`;
 
   // ── 集計テーブル ───────────────────────────────────────────
+  const lineTotal = parseInt(lineData.line_total) || 0;
+  const lineAdd   = parseInt(lineData.line_add)   || 0;
   html += `<div class="card" style="margin-top:16px">
-    <div class="card-title">📋 ${y}年${m}月　店舗別集計</div>
+    <div class="card-title">📋 ${y}年${m}月　集計</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:#f0faf4;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:#27ae60;font-weight:600;margin-bottom:4px">📱 LINE友達合計数</div>
+        <div style="font-size:22px;font-weight:700;color:#1a1a2e">${lineTotal.toLocaleString()}<span style="font-size:13px;color:#888;margin-left:3px">人</span></div>
+      </div>
+      <div style="background:#f0faf4;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:#27ae60;font-weight:600;margin-bottom:4px">📱 今月追加数</div>
+        <div style="font-size:22px;font-weight:700;color:#1a1a2e">${lineAdd.toLocaleString()}<span style="font-size:13px;color:#888;margin-left:3px">人</span></div>
+      </div>
+    </div>
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
@@ -5064,34 +5116,35 @@ async function renderInflow() {
 
 function openInflowImport() {
   const { y, m } = inflowMonth;
-  const prompt = `以下の2つのデータをエルメから取得して、JSONで返してください。
+  const prompt = `以下のデータをエルメから取得して、JSONのみを返してください（余分な説明は不要）。
 
 【1】ご新規カルテフォーム回答（bot_id: aRo9dx, form_id: 201419）
 　対象期間：${y}年${m}月1日〜末日（answered_at で絞り込む）
 　来店店舗フィールドで店舗を判別して新規客数をカウント
 　サブスクに申し込みましたか？がはいの件数をサブスク契約数としてカウント
 
-【2】LINE友達追加数
-　bot_id: aRo9dx のボット（SamuraiBeautyの全店舗）の${y}年${m}月の友達追加数
-　店舗別に取得できる場合は店舗別、できない場合は合計を nishishinjuku に入れて他は0にする
+【2】LINE友達数（全店舗合計・bot_id: aRo9dx）
+　${y}年${m}月末時点の友達合計数
+　${y}年${m}月中に追加された友達数（今月追加数）
 
-以下のJSON形式のみを返してください（余分な説明は不要）：
+返答形式：
 
 {
+  "line": {
+    "line_total": <${y}年${m}月末の友達合計数>,
+    "line_add": <${y}年${m}月の今月追加数>
+  },
   "nishishinjuku": {
     "new_client": <西新宿小滝橋通り 店 の新規客数>,
-    "subscribe": <西新宿小滝橋通り 店 のサブスク契約数>,
-    "line_add": <西新宿の友達追加数（または合計）>
+    "subscribe": <西新宿小滝橋通り 店 のサブスク契約数>
   },
   "sanchome": {
     "new_client": <新宿三丁目 店 の新規客数>,
-    "subscribe": <新宿三丁目 店 のサブスク契約数>,
-    "line_add": <新宿三丁目の友達追加数>
+    "subscribe": <新宿三丁目 店 のサブスク契約数>
   },
   "shibuya": {
     "new_client": <渋谷東 店 の新規客数>,
-    "subscribe": <渋谷東 店 のサブスク契約数>,
-    "line_add": <渋谷東の友達追加数>
+    "subscribe": <渋谷東 店 のサブスク契約数>
   }
 }`;
 
@@ -5133,17 +5186,26 @@ async function importInflowFromClaude() {
   msg.style.color = '#888';
 
   try {
-    await Promise.all(INFLOW_STORES.map(async store => {
+    const saves = [];
+    // LINE友達（全店舗合計）
+    if (parsed.line) {
+      const ld = Object.assign({}, getInflowLineData(y, m));
+      if (parsed.line.line_total !== undefined) ld.line_total = Number(parsed.line.line_total) || 0;
+      if (parsed.line.line_add   !== undefined) ld.line_add   = Number(parsed.line.line_add)   || 0;
+      setInflowLineCache(y, m, ld);
+      saves.push(saveInflowToSupabase(INFLOW_LINE_KEY, y, m, ld));
+    }
+    // 店舗別（新規客数・サブスク）
+    INFLOW_STORES.forEach(store => {
       const incoming = parsed[store.key];
       if (!incoming) return;
-      const existing = getInflowData(store.key, y, m);
-      const merged = Object.assign({}, existing);
+      const merged = Object.assign({}, getInflowData(store.key, y, m));
       if (incoming.new_client !== undefined) merged.new_client = Number(incoming.new_client) || 0;
       if (incoming.subscribe  !== undefined) merged.subscribe  = Number(incoming.subscribe)  || 0;
-      if (incoming.line_add   !== undefined && incoming.line_add > 0) merged.line_add = Number(incoming.line_add) || 0;
       setInflowCache(store.key, y, m, merged);
-      await saveInflowToSupabase(store.key, y, m, merged);
-    }));
+      saves.push(saveInflowToSupabase(store.key, y, m, merged));
+    });
+    await Promise.all(saves);
     msg.textContent = '✅ インポート完了！';
     msg.style.color = 'green';
     setTimeout(() => { closeInflowImport(); renderInflow(); }, 1200);
@@ -5164,7 +5226,19 @@ async function saveInflowForm() {
   const btn = document.querySelector('#inflowContent button');
   if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
 
-  await Promise.all(editableStores.map(async store => {
+  const saves = [];
+
+  // LINE友達（全店舗合計）
+  const lineData = {};
+  const lt = parseInt(document.getElementById('inflow_line_total')?.value);
+  const la = parseInt(document.getElementById('inflow_line_add')?.value);
+  if (!isNaN(lt) && lt >= 0) lineData.line_total = lt;
+  if (!isNaN(la) && la >= 0) lineData.line_add   = la;
+  setInflowLineCache(y, m, lineData);
+  saves.push(saveInflowToSupabase(INFLOW_LINE_KEY, y, m, lineData));
+
+  // 店舗別
+  editableStores.forEach(store => {
     const data = {};
     INFLOW_FIELDS.forEach(f => {
       const inp = document.getElementById(`inflow_${store.key}_${f.key}`);
@@ -5172,9 +5246,10 @@ async function saveInflowForm() {
       if (!isNaN(v) && v >= 0) data[f.key] = v;
     });
     setInflowCache(store.key, y, m, data);
-    await saveInflowToSupabase(store.key, y, m, data);
-  }));
+    saves.push(saveInflowToSupabase(store.key, y, m, data));
+  });
 
+  await Promise.all(saves);
   alert('保存しました');
   renderInflow();
 }
