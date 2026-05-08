@@ -5064,29 +5064,36 @@ async function renderInflow() {
 
 function openInflowImport() {
   const { y, m } = inflowMonth;
-  const prompt = `エルメのご新規カルテフォーム（bot_id: aRo9dx, form_id: 201419）の${y}年${m}月の回答を取得してください。
+  const prompt = `以下の2つのデータをエルメから取得して、JSONで返してください。
+
+【1】ご新規カルテフォーム回答（bot_id: aRo9dx, form_id: 201419）
+　対象期間：${y}年${m}月1日〜末日（answered_at で絞り込む）
+　来店店舗フィールドで店舗を判別して新規客数をカウント
+　サブスクに申し込みましたか？がはいの件数をサブスク契約数としてカウント
+
+【2】LINE友達追加数
+　bot_id: aRo9dx のボット（SamuraiBeautyの全店舗）の${y}年${m}月の友達追加数
+　店舗別に取得できる場合は店舗別、できない場合は合計を nishishinjuku に入れて他は0にする
 
 以下のJSON形式のみを返してください（余分な説明は不要）：
 
 {
   "nishishinjuku": {
-    "new_client": <西新宿小滝橋通り 店 の新規客数（来店店舗フィールドで判別）>,
-    "subscribe": <サブスク契約数（サブスクに申し込みましたか？がはいの件数）>,
-    "line_add": 0
+    "new_client": <西新宿小滝橋通り 店 の新規客数>,
+    "subscribe": <西新宿小滝橋通り 店 のサブスク契約数>,
+    "line_add": <西新宿の友達追加数（または合計）>
   },
   "sanchome": {
     "new_client": <新宿三丁目 店 の新規客数>,
-    "subscribe": <サブスク契約数>,
-    "line_add": 0
+    "subscribe": <新宿三丁目 店 のサブスク契約数>,
+    "line_add": <新宿三丁目の友達追加数>
   },
   "shibuya": {
     "new_client": <渋谷東 店 の新規客数>,
-    "subscribe": <サブスク契約数>,
-    "line_add": 0
+    "subscribe": <渋谷東 店 のサブスク契約数>,
+    "line_add": <渋谷東の友達追加数>
   }
-}
-
-対象期間：${y}年${m}月1日〜末日（answered_at で絞り込む）`;
+}`;
 
   document.getElementById('inflowPromptTemplate').textContent = prompt;
   document.getElementById('inflowImportJson').value = '';
