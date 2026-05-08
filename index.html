@@ -476,6 +476,9 @@
       <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
         <span class="icon">💬</span><span>ご意見箱</span>
       </div>
+      <div class="nav-item" onclick="showSection('inflow')" id="nav-inflow" style="display:none">
+        <span class="icon">📊</span><span>流入分析</span>
+      </div>
       <div class="nav-item" onclick="showSection('photo')" id="nav-photo">
         <span class="icon">📸</span><span>フォト</span>
       </div>
@@ -1041,6 +1044,21 @@
             </div>
             <div id="allSuggestionsList"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- ====== 流入分析 ====== -->
+      <div class="section" id="section-inflow">
+        <div class="section-title">📊 流入分析</div>
+        <div class="shift-status-bar" style="margin-bottom:12px">
+          <div class="month-nav">
+            <button onclick="inflowPrev()">&#8249;</button>
+            <span class="month-label" id="inflowMonthLabel"></span>
+            <button onclick="inflowNext()">&#8250;</button>
+          </div>
+        </div>
+        <div id="inflowContent" style="padding-bottom:24px">
+          <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
         </div>
       </div>
 
@@ -2105,6 +2123,7 @@ function doLogin() {
   shiftManageMonth = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewMonth   = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   swapMonth        = { y: _ry, m: _rm }; // シフト提出と同じ月をデフォルト
+  inflowMonth      = { y: _t.getFullYear(), m: _t.getMonth() + 1 };
   shiftViewStores  = getAllowedViewStores();
   const isHonsha = store === 'honsha';
   const isMgr = isHonsha || isManagerRole(name, store);
@@ -2119,6 +2138,8 @@ function doLogin() {
   document.getElementById('nav-shift-request').style.display = isMgr ? 'none' : 'flex';
   // シフト交換は本社以外（スタイリスト・店舗管理者）に表示、本社は履歴閲覧のみ
   document.getElementById('nav-shift-swap').style.display = 'flex';
+  // 流入分析は本社・FCオーナーのみ
+  document.getElementById('nav-inflow').style.display = isMgr ? 'flex' : 'none';
   // 店舗管理者はデフォルトで自店舗のみ表示
   if (isMgr && !isHonsha) {
     shiftManageStore = [store];
@@ -2312,6 +2333,7 @@ function showSection(name) {
   else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
   else if (name === 'reservations') { loadTodayReservations(); }
   else if (name === 'shift-swap') { renderShiftSwap(); }
+  else if (name === 'inflow') { renderInflow(); }
   else if (name === 'photo') { renderPhotoGallery(); }
 }
 
@@ -4895,6 +4917,144 @@ window.addEventListener('load', async () => {
     doLogin();
   }
 });
+
+// ============================================================
+// 流入分析
+// ============================================================
+const INFLOW_STORES = [
+  { key: 'nishishinjuku', label: '西新宿' },
+  { key: 'sanchome',      label: '新宿三丁目' },
+  { key: 'shibuya',       label: '渋谷東' },
+];
+const INFLOW_FIELDS = [
+  { key: 'line_add',    label: 'LINE友達追加数', unit: '人', color: '#27ae60' },
+  { key: 'new_client',  label: '新規客数',       unit: '人', color: '#2980b9' },
+  { key: 'subscribe',   label: 'サブスク契約数', unit: '件', color: '#8e44ad' },
+];
+
+let inflowMonth = { y: 0, m: 0 };
+
+function inflowKey(storeKey, y, m) {
+  return `inflow_${storeKey}_${y}_${m}`;
+}
+function getInflowData(storeKey, y, m) {
+  const raw = localStorage.getItem(inflowKey(storeKey, y, m));
+  return raw ? JSON.parse(raw) : {};
+}
+function saveInflowData(storeKey, y, m, data) {
+  localStorage.setItem(inflowKey(storeKey, y, m), JSON.stringify(data));
+}
+
+function inflowPrev() {
+  inflowMonth.m--;
+  if (inflowMonth.m < 1) { inflowMonth.m = 12; inflowMonth.y--; }
+  renderInflow();
+}
+function inflowNext() {
+  inflowMonth.m++;
+  if (inflowMonth.m > 12) { inflowMonth.m = 1; inflowMonth.y++; }
+  renderInflow();
+}
+
+function renderInflow() {
+  const el = document.getElementById('inflowContent');
+  if (!el) return;
+  const { y, m } = inflowMonth;
+  document.getElementById('inflowMonthLabel').textContent = fmtMonth(y, m);
+
+  const canEdit = currentStore === 'honsha' || isFCOwner();
+  const editableStores = currentStore === 'honsha'
+    ? INFLOW_STORES
+    : INFLOW_STORES.filter(s => getAllowedViewStores().includes(s.key));
+
+  // ── 入力フォーム ──────────────────────────────────────────
+  let html = `<div class="card"><div class="card-title">📝 データ入力（${y}年${m}月）</div>`;
+
+  if (!canEdit) {
+    html += `<p style="color:#aaa;font-size:13px">閲覧のみ可能です</p>`;
+  } else {
+    editableStores.forEach(store => {
+      const data = getInflowData(store.key, y, m);
+      html += `<div style="margin-bottom:18px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">🏪 ${store.label}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
+      INFLOW_FIELDS.forEach(f => {
+        const val = data[f.key] || '';
+        html += `<div style="background:#f8f9fa;border-radius:10px;padding:10px">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">${f.label}</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" min="0" value="${val}"
+              id="inflow_${store.key}_${f.key}"
+              style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-align:right">
+            <span style="font-size:12px;color:#888;white-space:nowrap">${f.unit}</span>
+          </div>
+        </div>`;
+      });
+      html += `</div></div>`;
+    });
+    html += `<button onclick="saveInflowForm()" style="width:100%;padding:12px;background:#0f3460;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px">💾 保存する</button>`;
+  }
+  html += `</div>`;
+
+  // ── 集計テーブル ───────────────────────────────────────────
+  html += `<div class="card" style="margin-top:16px">
+    <div class="card-title">📋 ${y}年${m}月　店舗別集計</div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f0f0f0">
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #ddd;white-space:nowrap">店舗</th>`;
+  INFLOW_FIELDS.forEach(f => {
+    html += `<th style="padding:10px 12px;text-align:right;border-bottom:2px solid #ddd;white-space:nowrap;color:${f.color}">${f.label}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+
+  const totals = {};
+  INFLOW_FIELDS.forEach(f => { totals[f.key] = 0; });
+
+  INFLOW_STORES.forEach((store, i) => {
+    const data = getInflowData(store.key, y, m);
+    const bg = i % 2 === 0 ? '#fff' : '#fafafa';
+    html += `<tr style="background:${bg}">
+      <td style="padding:10px 12px;border-bottom:1px solid #eee;font-weight:600">${store.label}</td>`;
+    INFLOW_FIELDS.forEach(f => {
+      const v = parseInt(data[f.key]) || 0;
+      totals[f.key] += v;
+      html += `<td style="padding:10px 12px;text-align:right;border-bottom:1px solid #eee">${v.toLocaleString()} ${f.unit}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `<tr style="background:#f0f4ff;font-weight:700">
+    <td style="padding:10px 12px;border-top:2px solid #ddd">合計</td>`;
+  INFLOW_FIELDS.forEach(f => {
+    html += `<td style="padding:10px 12px;text-align:right;border-top:2px solid #ddd;color:${f.color}">${totals[f.key].toLocaleString()} ${f.unit}</td>`;
+  });
+  html += `</tr></tbody></table></div></div>`;
+
+  el.innerHTML = html;
+}
+
+function saveInflowForm() {
+  const { y, m } = inflowMonth;
+  const canEdit = currentStore === 'honsha' || isFCOwner();
+  if (!canEdit) return;
+  const editableStores = currentStore === 'honsha'
+    ? INFLOW_STORES
+    : INFLOW_STORES.filter(s => getAllowedViewStores().includes(s.key));
+
+  editableStores.forEach(store => {
+    const data = {};
+    INFLOW_FIELDS.forEach(f => {
+      const el = document.getElementById(`inflow_${store.key}_${f.key}`);
+      const v = parseInt(el?.value);
+      if (!isNaN(v) && v >= 0) data[f.key] = v;
+    });
+    saveInflowData(store.key, y, m, data);
+  });
+  alert('保存しました');
+  renderInflow();
+}
 </script>
 </body>
 </html>
