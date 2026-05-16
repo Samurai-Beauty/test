@@ -1,5 +1,15 @@
 # Samurai System — プロジェクト概要
 
+## 未完成・保留中の機能
+
+### GBP クチコミ自動返信ボット（PR #1）
+- ブランチ: `claude/show-reply-bot-code-qrmb2`
+- ファイル: `reply_bot.py`
+- 内容: Selenium で Google ビジネスプロフィールの口コミ画面を操作し、Claude API（Opus 4.7）で日本語返信文を自動生成
+- 対象: 西新宿本店・新宿三丁目・渋谷東店
+- ステータス: Draft PR — 開発継続予定
+- 次回セッションで続きを実装すること
+
 ## 概要
 Samurai Beauty（美容院）スタッフ向け社内管理システム。
 単一ファイル（`index.html`）で完結。GitHub Pages でホスティング。
