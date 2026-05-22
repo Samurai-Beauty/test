@@ -5274,14 +5274,26 @@ async function renderDaily() {
   } else {
     // 入力フォームモード
     html += `<div class="card" id="dailyFormCard">
-      <div class="card-title">📝 ${storeLabel}　${dailyFmtDate(dailyDate)}　日報提出</div>`;
+      <div class="card-title">📝 日報提出　${dailyFmtDate(dailyDate)}</div>`;
 
     if (!canSubmit) {
       html += `<p style="color:#aaa;font-size:13px">未来の日付には提出できません</p></div>`;
     } else {
-      // スタッフシフト
+      // ① 店舗選択
+      const storeOpts = DAILY_STORES.map(s =>
+        `<option value="${s.key}" ${s.key === dailyStore ? 'selected' : ''}>${s.label}</option>`
+      ).join('');
       html += `<div style="margin-bottom:18px">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">👥 出勤スタッフ</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">① 店舗</div>
+        <select id="daily_store_select" onchange="dailyOnStoreChange(this.value)"
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;background:#f8f9fa">
+          ${storeOpts}
+        </select>
+      </div>`;
+
+      // スタッフシフト（店舗に応じたメンバー）
+      html += `<div style="margin-bottom:18px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">② 出勤スタッフ</div>
         <div id="dailyShiftRows">`;
       (existing?.staff_shifts || [{ name: '', start: '', end: '' }]).forEach((s, i) => {
         html += dailyShiftRow(i, s.name, s.start, s.end, storeMembers);
@@ -5293,7 +5305,7 @@ async function renderDaily() {
       // 客数
       const c = existing?.customers || {};
       html += `<div style="margin-bottom:18px">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">👤 客数</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">③ 客数</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
           ${[['total','総客数','人'],['repeat','リピート','名'],['subscribe','サブスク','名'],['new_client','新規','名']].map(([k,l,u])=>
             `<div style="background:#f8f9fa;border-radius:10px;padding:10px">
@@ -5309,7 +5321,7 @@ async function renderDaily() {
 
       // サブスク契約
       html += `<div style="margin-bottom:18px">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">💳 サブスク契約数</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④ サブスク契約数</div>
         <div style="display:flex;align-items:center;gap:8px;background:#f8f9fa;border-radius:10px;padding:12px">
           <input type="number" min="0" value="${existing?.subscribe_contracts??''}" id="daily_subscribe_contracts"
             style="width:100px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:16px;text-align:right">
@@ -5320,7 +5332,7 @@ async function renderDaily() {
       // 業務チェックリスト
       const doneTasks = existing?.tasks || [];
       html += `<div style="margin-bottom:18px">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">✅ 実施業務（該当するものにチェック）</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑤ 実施業務（該当するものにチェック）</div>
         <div style="display:flex;flex-direction:column;gap:6px" id="dailyTaskList">`;
       DAILY_TASKS_DEFAULT.forEach(t => {
         const checked = doneTasks.includes(t);
@@ -5339,7 +5351,7 @@ async function renderDaily() {
 
       // メモ
       html += `<div style="margin-bottom:18px">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">📄 備考・メモ（任意）</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑥ 備考・メモ（任意）</div>
         <textarea id="daily_memo" rows="3" placeholder="特記事項など..."
           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical">${existing?.memo||''}</textarea>
       </div>`;
@@ -5403,6 +5415,21 @@ function dailySelectStore(storeKey) {
   renderDaily();
 }
 
+function dailyOnStoreChange(storeKey) {
+  dailyStore = storeKey;
+  // スタッフ行を選択した店舗のメンバーで再描画
+  const container = document.getElementById('dailyShiftRows');
+  if (!container) return;
+  const members = STORE_MEMBERS[storeKey] || [];
+  const rows = container.querySelectorAll('[id^="dailyShiftRow_"]');
+  rows.forEach((row, i) => {
+    const sel = row.querySelector('select');
+    const currentVal = sel?.value || '';
+    const opts = members.map(m => `<option value="${m}" ${m===currentVal?'selected':''}>${m}</option>`).join('');
+    if (sel) sel.innerHTML = `<option value="">スタッフ選択</option>${opts}`;
+  });
+}
+
 async function loadDailyFromSupabase(key) {
   try {
     const { data, error } = await sb.from('sales_data')
@@ -5431,6 +5458,10 @@ async function submitDailyReport() {
   if (btn) { btn.disabled = true; btn.textContent = '提出中...'; }
 
   try {
+    // 店舗選択を反映
+    const storeSelect = document.getElementById('daily_store_select');
+    if (storeSelect) dailyStore = storeSelect.value;
+
     // スタッフシフト収集
     const shifts = [];
     let i = 0;
