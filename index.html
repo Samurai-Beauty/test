@@ -5260,20 +5260,18 @@ async function renderDaily() {
     const c = existing.customers || {};
     const custTotal = (c.new_client||0) + (c.subscribe||0);
     html += `<div style="margin-bottom:14px"><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1a1a2e">👤 客数</div>
-      <div style="background:#f8f9fa;border-radius:12px;padding:12px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-          <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #f5c6c6">
-            <div style="font-size:11px;color:#e74c3c;font-weight:600;margin-bottom:2px">新規</div>
-            <div style="font-size:22px;font-weight:700;color:#e74c3c">${c.new_client||0}<span style="font-size:12px">名</span></div>
-          </div>
-          <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #c9b1e8">
-            <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:2px">サブスク</div>
-            <div style="font-size:22px;font-weight:700;color:#8e44ad">${c.subscribe||0}<span style="font-size:12px">名</span></div>
-          </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:#0f3460;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;margin-bottom:2px">客数（合計）</div>
+          <div style="font-size:26px;font-weight:700;color:#fff;line-height:1">${custTotal}<span style="font-size:12px;margin-left:2px">名</span></div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:#0f3460;border-radius:8px;padding:10px 14px;color:#fff">
-          <span style="font-size:13px;font-weight:600">合計客数</span>
-          <span style="font-size:22px;font-weight:700">${custTotal}<span style="font-size:13px;margin-left:3px">名</span></span>
+        <div style="background:#f5f0ff;border-radius:10px;padding:10px;text-align:center;border:1px solid #c9b1e8">
+          <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:2px">サブスク</div>
+          <div style="font-size:22px;font-weight:700;color:#8e44ad">${c.subscribe||0}<span style="font-size:12px">名</span></div>
+        </div>
+        <div style="background:#fff5f5;border-radius:10px;padding:10px;text-align:center;border:1px solid #f5c6c6">
+          <div style="font-size:11px;color:#e74c3c;font-weight:600;margin-bottom:2px">新規</div>
+          <div style="font-size:22px;font-weight:700;color:#e74c3c">${c.new_client||0}<span style="font-size:12px">名</span></div>
         </div>
       </div>
     </div>`;
@@ -5340,30 +5338,28 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
   const c = existing?.customers || {};
   html += `<div style="margin-bottom:18px">
     <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">③ 客数</div>
-    <div style="background:#f8f9fa;border-radius:12px;padding:14px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #f5c6c6">
-          <div style="font-size:12px;color:#e74c3c;font-weight:600;margin-bottom:4px">新規</div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" min="0" value="${c.new_client??''}" id="daily_cust_new_client"
-              oninput="dailyCalcTotal()"
-              style="width:100%;padding:7px;border:1px solid #f5c6c6;border-radius:6px;font-size:16px;text-align:right">
-            <span style="font-size:12px;color:#888">名</span>
-          </div>
-        </div>
-        <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #c9b1e8">
-          <div style="font-size:12px;color:#8e44ad;font-weight:600;margin-bottom:4px">サブスク</div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" min="0" value="${c.subscribe??''}" id="daily_cust_subscribe"
-              oninput="dailyCalcTotal()"
-              style="width:100%;padding:7px;border:1px solid #c9b1e8;border-radius:6px;font-size:16px;text-align:right">
-            <span style="font-size:12px;color:#888">名</span>
-          </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="background:#0f3460;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;margin-bottom:4px">客数（合計）</div>
+        <div id="dailyTotalDisplay" style="font-size:26px;font-weight:700;color:#fff;line-height:1">${(c.new_client||0)+(c.subscribe||0)}<span style="font-size:12px;margin-left:2px">名</span></div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #c9b1e8">
+        <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:4px">サブスク</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" min="0" value="${c.subscribe??''}" id="daily_cust_subscribe"
+            oninput="dailyCalcTotal()"
+            style="width:100%;padding:6px;border:1px solid #c9b1e8;border-radius:6px;font-size:18px;text-align:right">
+          <span style="font-size:11px;color:#888">名</span>
         </div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;background:#0f3460;border-radius:8px;padding:10px 14px;color:#fff">
-        <span style="font-size:13px;font-weight:600">合計客数</span>
-        <span id="dailyTotalDisplay" style="font-size:22px;font-weight:700">${(c.new_client||0)+(c.subscribe||0)}<span style="font-size:13px;margin-left:3px">名</span></span>
+      <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #f5c6c6">
+        <div style="font-size:11px;color:#e74c3c;font-weight:600;margin-bottom:4px">新規</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" min="0" value="${c.new_client??''}" id="daily_cust_new_client"
+            oninput="dailyCalcTotal()"
+            style="width:100%;padding:6px;border:1px solid #f5c6c6;border-radius:6px;font-size:18px;text-align:right">
+          <span style="font-size:11px;color:#888">名</span>
+        </div>
       </div>
     </div>
   </div>`;
