@@ -455,6 +455,9 @@
         <span class="icon">📆</span><span>本日の予約</span>
       </div>
       <div class="nav-divider"></div>
+      <div class="nav-item" onclick="showSection('daily')" id="nav-daily">
+        <span class="icon">📝</span><span>日報</span>
+      </div>
       <div class="nav-item" onclick="showSection('shift-request')" id="nav-shift-request">
         <span class="icon">📅</span><span>シフト希望</span>
       </div>
@@ -475,9 +478,6 @@
       </div>
       <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
         <span class="icon">💬</span><span>ご意見箱</span>
-      </div>
-      <div class="nav-item" onclick="showSection('daily')" id="nav-daily">
-        <span class="icon">📝</span><span>日報</span>
       </div>
       <div class="nav-item" onclick="showSection('inflow')" id="nav-inflow" style="display:none">
         <span class="icon">📊</span><span>流入分析</span>
@@ -5239,24 +5239,29 @@ async function renderDaily() {
     }
 
     const c = existing.customers || {};
+    const custTotal = (c.new_client||0) + (c.subscribe||0);
     html += `<div style="margin-bottom:14px"><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1a1a2e">👤 客数</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${[['総客数',c.total||0,'人','#0f3460'],['リピート',c.repeat||0,'名','#27ae60'],['サブスク',c.subscribe||0,'名','#8e44ad']].map(([l,v,u,col])=>
-          `<div style="background:#f8f9fa;border-radius:10px;padding:10px;text-align:center">
-            <div style="font-size:11px;color:#888;margin-bottom:2px">${l}</div>
-            <div style="font-size:20px;font-weight:700;color:${col}">${v}<span style="font-size:12px">${u}</span></div>
-          </div>`).join('')}
-      </div></div>`;
+      <div style="background:#f8f9fa;border-radius:12px;padding:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #f5c6c6">
+            <div style="font-size:11px;color:#e74c3c;font-weight:600;margin-bottom:2px">新規</div>
+            <div style="font-size:22px;font-weight:700;color:#e74c3c">${c.new_client||0}<span style="font-size:12px">名</span></div>
+          </div>
+          <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #c9b1e8">
+            <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:2px">サブスク</div>
+            <div style="font-size:22px;font-weight:700;color:#8e44ad">${c.subscribe||0}<span style="font-size:12px">名</span></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#0f3460;border-radius:8px;padding:10px 14px;color:#fff">
+          <span style="font-size:13px;font-weight:600">合計客数</span>
+          <span style="font-size:22px;font-weight:700">${custTotal}<span style="font-size:13px;margin-left:3px">名</span></span>
+        </div>
+      </div>
+    </div>`;
 
-    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="padding:10px 14px;background:#fff0f0;border-radius:10px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:13px;color:#e74c3c">👤 新規客数</span>
-        <span style="font-size:20px;font-weight:700;color:#e74c3c">${c.new_client||0}<span style="font-size:13px">名</span></span>
-      </div>
-      <div style="padding:10px 14px;background:#f0f4ff;border-radius:10px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:13px;color:#8e44ad">💳 サブスク契約数</span>
-        <span style="font-size:20px;font-weight:700;color:#8e44ad">${existing.subscribe_contracts||0}<span style="font-size:13px">件</span></span>
-      </div>
+    html += `<div style="padding:10px 14px;background:#f0f4ff;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-weight:700;font-size:13px;color:#8e44ad">💳 サブスク契約数</span>
+      <span style="font-size:20px;font-weight:700;color:#8e44ad">${existing.subscribe_contracts||0}<span style="font-size:13px">件</span></span>
     </div>`;
 
     if (existing.tasks?.length) {
@@ -5312,36 +5317,41 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     <button onclick="dailyAddShift()" style="margin-top:6px;padding:7px 14px;background:#f0f4ff;color:#0f3460;border:1px solid #c0d0ff;border-radius:8px;font-size:13px;cursor:pointer">＋ スタッフ追加</button>
   </div>`;
 
-  // ③ 客数（総・リピート・サブスク）
+  // ③ 客数（新規・サブスク入力 → 合計自動）
   const c = existing?.customers || {};
   html += `<div style="margin-bottom:18px">
     <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">③ 客数</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-      ${[['total','総客数','人'],['repeat','リピート','名'],['subscribe','サブスク','名']].map(([k,l,u])=>
-        `<div style="background:#f8f9fa;border-radius:10px;padding:10px">
-          <div style="font-size:11px;color:#888;margin-bottom:4px">${l}</div>
+    <div style="background:#f8f9fa;border-radius:12px;padding:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #f5c6c6">
+          <div style="font-size:12px;color:#e74c3c;font-weight:600;margin-bottom:4px">新規</div>
           <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" min="0" value="${c[k]??''}" id="daily_cust_${k}"
-              style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-align:right">
-            <span style="font-size:12px;color:#888">${u}</span>
+            <input type="number" min="0" value="${c.new_client??''}" id="daily_cust_new_client"
+              oninput="dailyCalcTotal()"
+              style="width:100%;padding:7px;border:1px solid #f5c6c6;border-radius:6px;font-size:16px;text-align:right">
+            <span style="font-size:12px;color:#888">名</span>
           </div>
-        </div>`).join('')}
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #c9b1e8">
+          <div style="font-size:12px;color:#8e44ad;font-weight:600;margin-bottom:4px">サブスク</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" min="0" value="${c.subscribe??''}" id="daily_cust_subscribe"
+              oninput="dailyCalcTotal()"
+              style="width:100%;padding:7px;border:1px solid #c9b1e8;border-radius:6px;font-size:16px;text-align:right">
+            <span style="font-size:12px;color:#888">名</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:#0f3460;border-radius:8px;padding:10px 14px;color:#fff">
+        <span style="font-size:13px;font-weight:600">合計客数</span>
+        <span id="dailyTotalDisplay" style="font-size:22px;font-weight:700">${(c.new_client||0)+(c.subscribe||0)}<span style="font-size:13px;margin-left:3px">名</span></span>
+      </div>
     </div>
   </div>`;
 
-  // ④ 新規客数
+  // ④ サブスク契約数
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④ 新規客数</div>
-    <div style="display:flex;align-items:center;gap:8px;background:#fff0f0;border-radius:10px;padding:12px;border:1px solid #f5c6c6">
-      <input type="number" min="0" value="${c.new_client??''}" id="daily_cust_new_client"
-        style="width:120px;padding:7px;border:1px solid #f5c6c6;border-radius:6px;font-size:16px;text-align:right;background:#fff">
-      <span style="color:#e74c3c;font-weight:600">名</span>
-    </div>
-  </div>`;
-
-  // ⑤ サブスク契約数
-  html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑤ サブスク契約数</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④ サブスク契約数</div>
     <div style="display:flex;align-items:center;gap:8px;background:#f8f9fa;border-radius:10px;padding:12px">
       <input type="number" min="0" value="${existing?.subscribe_contracts??''}" id="daily_subscribe_contracts"
         style="width:120px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:16px;text-align:right">
@@ -5349,10 +5359,10 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     </div>
   </div>`;
 
-  // ⑥ 実施業務
+  // ⑤ 実施業務
   const doneTasks = existing?.tasks || [];
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑥ 実施業務（該当するものにチェック）</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑤ 実施業務（該当するものにチェック）</div>
     <div style="display:flex;flex-direction:column;gap:6px" id="dailyTaskList">`;
   DAILY_TASKS_DEFAULT.forEach(t => {
     html += `<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#f8f9fa;border-radius:8px;cursor:pointer">
@@ -5368,9 +5378,9 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     </div>
   </div>`;
 
-  // ⑦ 備考
+  // ⑥ 備考
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑦ 備考・メモ（任意）</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑥ 備考・メモ（任意）</div>
     <textarea id="daily_memo" rows="3" placeholder="特記事項など..."
       style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical">${existing?.memo||''}</textarea>
   </div>`;
@@ -5407,6 +5417,13 @@ function dailyShiftRow(i, name, start, end, members) {
 }
 
 let dailyShiftCount = 1;
+function dailyCalcTotal() {
+  const n = parseInt(document.getElementById('daily_cust_new_client')?.value) || 0;
+  const s = parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0;
+  const el = document.getElementById('dailyTotalDisplay');
+  if (el) el.innerHTML = `${n + s}<span style="font-size:13px;margin-left:3px">名</span>`;
+}
+
 function dailyAddShift() {
   const container = document.getElementById('dailyShiftRows');
   if (!container) return;
@@ -5501,13 +5518,10 @@ async function submitDailyReport(status = 'submitted') {
       i++;
     }
 
-    // 客数
-    const customers = {
-      total:      parseInt(document.getElementById('daily_cust_total')?.value)      || 0,
-      repeat:     parseInt(document.getElementById('daily_cust_repeat')?.value)     || 0,
-      subscribe:  parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0,
-      new_client: parseInt(document.getElementById('daily_cust_new_client')?.value) || 0,
-    };
+    // 客数（新規 + サブスク → 合計自動計算）
+    const new_client = parseInt(document.getElementById('daily_cust_new_client')?.value) || 0;
+    const subscribe  = parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0;
+    const customers = { new_client, subscribe, total: new_client + subscribe };
 
     // チェックされた業務
     const tasks = [];
