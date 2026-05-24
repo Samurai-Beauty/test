@@ -455,6 +455,9 @@
         <span class="icon">📆</span><span>本日の予約</span>
       </div>
       <div class="nav-divider"></div>
+      <div class="nav-item" onclick="showSection('daily')" id="nav-daily">
+        <span class="icon">📝</span><span>日報</span>
+      </div>
       <div class="nav-item" onclick="showSection('shift-request')" id="nav-shift-request">
         <span class="icon">📅</span><span>シフト希望</span>
       </div>
@@ -475,9 +478,6 @@
       </div>
       <div class="nav-item" onclick="showSection('suggestions')" id="nav-suggestions">
         <span class="icon">💬</span><span>ご意見箱</span>
-      </div>
-      <div class="nav-item" onclick="showSection('daily')" id="nav-daily">
-        <span class="icon">📝</span><span>日報</span>
       </div>
       <div class="nav-item" onclick="showSection('inflow')" id="nav-inflow" style="display:none">
         <span class="icon">📊</span><span>流入分析</span>
@@ -1175,6 +1175,24 @@
 </div>
 
 <!-- ====== スタッフ選択モーダル ====== -->
+<div class="modal-overlay" id="dailyTasksMgrModal" style="display:none" onclick="closeDailyTasksMgr(event)">
+  <div class="modal-box" onclick="event.stopPropagation()" style="width:380px">
+    <h3>⚙️ 実施業務リストの管理</h3>
+    <div id="dailyTasksMgrList"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input type="text" id="dailyTasksMgrInput" placeholder="業務名を入力..."
+        style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:13px"
+        onkeydown="if(event.key==='Enter')addDailyTaskMasterItem()">
+      <button onclick="addDailyTaskMasterItem()" style="padding:8px 14px;background:#0f3460;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">追加</button>
+    </div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-cancel" onclick="document.getElementById('dailyTasksMgrModal').style.display='none'">キャンセル</button>
+      <button class="btn-primary" id="dailyTasksMgrSaveBtn" onclick="saveDailyTasksMgrAndClose()"
+        style="flex:1;padding:9px;border-radius:8px;border:none;background:#0f3460;color:#fff;cursor:pointer;font-size:14px;font-weight:600">保存して閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="staffModal" style="display:none" onclick="closeStaffModal(event)">
   <div class="modal-box" onclick="event.stopPropagation()">
     <h3 id="modalDayLabel">担当スタッフを選択</h3>
@@ -5143,7 +5161,7 @@ async function renderInflow() {
 // ============================================================
 const DAILY_TASKS_DEFAULT = [
   'ブログ更新', 'X（SNS）更新', 'Instagram更新',
-  'コットン補充', '備品消毒', 'カルテ記入',
+  'フォトアップロード', 'カルテ記入',
 ];
 const DAILY_STORES = [
   { key: 'nishishinjuku', label: '西新宿' },
@@ -5202,6 +5220,7 @@ async function renderDaily() {
 
   el.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>';
 
+  await loadDailyTasksMaster();
   const dateStr  = dailyDateStr(dailyDate);
   const key      = dailyKey(dailyStore, dateStr);
   const existing = await loadDailyFromSupabase(key);
@@ -5239,24 +5258,27 @@ async function renderDaily() {
     }
 
     const c = existing.customers || {};
+    const custTotal = (c.new_client||0) + (c.subscribe||0);
     html += `<div style="margin-bottom:14px"><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1a1a2e">👤 客数</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${[['総客数',c.total||0,'人','#0f3460'],['リピート',c.repeat||0,'名','#27ae60'],['サブスク',c.subscribe||0,'名','#8e44ad']].map(([l,v,u,col])=>
-          `<div style="background:#f8f9fa;border-radius:10px;padding:10px;text-align:center">
-            <div style="font-size:11px;color:#888;margin-bottom:2px">${l}</div>
-            <div style="font-size:20px;font-weight:700;color:${col}">${v}<span style="font-size:12px">${u}</span></div>
-          </div>`).join('')}
-      </div></div>`;
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:#0f3460;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;margin-bottom:2px">客数（合計）</div>
+          <div style="font-size:26px;font-weight:700;color:#fff;line-height:1">${custTotal}<span style="font-size:12px;margin-left:2px">名</span></div>
+        </div>
+        <div style="background:#f5f0ff;border-radius:10px;padding:10px;text-align:center;border:1px solid #c9b1e8">
+          <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:2px">サブスク</div>
+          <div style="font-size:22px;font-weight:700;color:#8e44ad">${c.subscribe||0}<span style="font-size:12px">名</span></div>
+        </div>
+        <div style="background:#fff5f5;border-radius:10px;padding:10px;text-align:center;border:1px solid #f5c6c6">
+          <div style="font-size:11px;color:#e74c3c;font-weight:600;margin-bottom:2px">新規</div>
+          <div style="font-size:22px;font-weight:700;color:#e74c3c">${c.new_client||0}<span style="font-size:12px">名</span></div>
+        </div>
+      </div>
+    </div>`;
 
-    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="padding:10px 14px;background:#fff0f0;border-radius:10px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:13px;color:#e74c3c">👤 新規客数</span>
-        <span style="font-size:20px;font-weight:700;color:#e74c3c">${c.new_client||0}<span style="font-size:13px">名</span></span>
-      </div>
-      <div style="padding:10px 14px;background:#f0f4ff;border-radius:10px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:13px;color:#8e44ad">💳 サブスク契約数</span>
-        <span style="font-size:20px;font-weight:700;color:#8e44ad">${existing.subscribe_contracts||0}<span style="font-size:13px">件</span></span>
-      </div>
+    html += `<div style="padding:10px 14px;background:#f0f4ff;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-weight:700;font-size:13px;color:#8e44ad">💳 サブスク契約数</span>
+      <span style="font-size:20px;font-weight:700;color:#8e44ad">${existing.subscribe_contracts||0}<span style="font-size:13px">件</span></span>
     </div>`;
 
     if (existing.tasks?.length) {
@@ -5312,36 +5334,39 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     <button onclick="dailyAddShift()" style="margin-top:6px;padding:7px 14px;background:#f0f4ff;color:#0f3460;border:1px solid #c0d0ff;border-radius:8px;font-size:13px;cursor:pointer">＋ スタッフ追加</button>
   </div>`;
 
-  // ③ 客数（総・リピート・サブスク）
+  // ③ 客数（新規・サブスク入力 → 合計自動）
   const c = existing?.customers || {};
   html += `<div style="margin-bottom:18px">
     <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">③ 客数</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-      ${[['total','総客数','人'],['repeat','リピート','名'],['subscribe','サブスク','名']].map(([k,l,u])=>
-        `<div style="background:#f8f9fa;border-radius:10px;padding:10px">
-          <div style="font-size:11px;color:#888;margin-bottom:4px">${l}</div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" min="0" value="${c[k]??''}" id="daily_cust_${k}"
-              style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-align:right">
-            <span style="font-size:12px;color:#888">${u}</span>
-          </div>
-        </div>`).join('')}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="background:#0f3460;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;margin-bottom:4px">客数（合計）</div>
+        <div id="dailyTotalDisplay" style="font-size:26px;font-weight:700;color:#fff;line-height:1">${(c.new_client||0)+(c.subscribe||0)}<span style="font-size:12px;margin-left:2px">名</span></div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #c9b1e8">
+        <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:4px">サブスク</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" min="0" value="${c.subscribe??''}" id="daily_cust_subscribe"
+            oninput="dailyCalcTotal()"
+            style="width:100%;padding:6px;border:1px solid #c9b1e8;border-radius:6px;font-size:18px;text-align:right">
+          <span style="font-size:11px;color:#888">名</span>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #f5c6c6">
+        <div style="font-size:11px;color:#e74c3c;font-weight:600;margin-bottom:4px">新規</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" min="0" value="${c.new_client??''}" id="daily_cust_new_client"
+            oninput="dailyCalcTotal()"
+            style="width:100%;padding:6px;border:1px solid #f5c6c6;border-radius:6px;font-size:18px;text-align:right">
+          <span style="font-size:11px;color:#888">名</span>
+        </div>
+      </div>
     </div>
   </div>`;
 
-  // ④ 新規客数
+  // ④ サブスク契約数
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④ 新規客数</div>
-    <div style="display:flex;align-items:center;gap:8px;background:#fff0f0;border-radius:10px;padding:12px;border:1px solid #f5c6c6">
-      <input type="number" min="0" value="${c.new_client??''}" id="daily_cust_new_client"
-        style="width:120px;padding:7px;border:1px solid #f5c6c6;border-radius:6px;font-size:16px;text-align:right;background:#fff">
-      <span style="color:#e74c3c;font-weight:600">名</span>
-    </div>
-  </div>`;
-
-  // ⑤ サブスク契約数
-  html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑤ サブスク契約数</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④ サブスク契約数</div>
     <div style="display:flex;align-items:center;gap:8px;background:#f8f9fa;border-radius:10px;padding:12px">
       <input type="number" min="0" value="${existing?.subscribe_contracts??''}" id="daily_subscribe_contracts"
         style="width:120px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:16px;text-align:right">
@@ -5349,12 +5374,16 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     </div>
   </div>`;
 
-  // ⑥ 実施業務
+  // ⑤ 実施業務
   const doneTasks = existing?.tasks || [];
+  const masterTasks = dailyTasksMaster || DAILY_TASKS_DEFAULT;
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑥ 実施業務（該当するものにチェック）</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-weight:700;font-size:14px;color:#1a1a2e">⑤ 実施業務（該当するものにチェック）</div>
+      ${isMgr ? `<button onclick="openDailyTasksManager()" style="padding:4px 10px;background:#f0f4ff;color:#0f3460;border:1px solid #c0d0ff;border-radius:6px;font-size:12px;cursor:pointer">⚙️ 項目管理</button>` : ''}
+    </div>
     <div style="display:flex;flex-direction:column;gap:6px" id="dailyTaskList">`;
-  DAILY_TASKS_DEFAULT.forEach(t => {
+  masterTasks.forEach(t => {
     html += `<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#f8f9fa;border-radius:8px;cursor:pointer">
       <input type="checkbox" value="${t}" ${doneTasks.includes(t)?'checked':''} style="width:18px;height:18px;accent-color:#27ae60;cursor:pointer">
       <span style="font-size:14px">${t}</span>
@@ -5368,9 +5397,9 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     </div>
   </div>`;
 
-  // ⑦ 備考
+  // ⑥ 備考
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑦ 備考・メモ（任意）</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑥ 備考・メモ（任意）</div>
     <textarea id="daily_memo" rows="3" placeholder="特記事項など..."
       style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical">${existing?.memo||''}</textarea>
   </div>`;
@@ -5407,6 +5436,13 @@ function dailyShiftRow(i, name, start, end, members) {
 }
 
 let dailyShiftCount = 1;
+function dailyCalcTotal() {
+  const n = parseInt(document.getElementById('daily_cust_new_client')?.value) || 0;
+  const s = parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0;
+  const el = document.getElementById('dailyTotalDisplay');
+  if (el) el.innerHTML = `${n + s}<span style="font-size:13px;margin-left:3px">名</span>`;
+}
+
 function dailyAddShift() {
   const container = document.getElementById('dailyShiftRows');
   if (!container) return;
@@ -5455,6 +5491,78 @@ function dailyOnStoreChange(storeKey) {
   });
 }
 
+// ── 実施業務マスタ管理 ────────────────────────────────────────
+let dailyTasksMaster = null;
+
+async function loadDailyTasksMaster() {
+  if (dailyTasksMaster !== null) return;
+  try {
+    const { data } = await sb.from('sales_data').select('data_json').eq('store_key', 'daily_tasks_master').single();
+    if (data?.data_json?.tasks) { dailyTasksMaster = data.data_json.tasks; return; }
+  } catch {}
+  dailyTasksMaster = [...DAILY_TASKS_DEFAULT];
+}
+
+async function saveDailyTasksMasterToSupabase(tasks) {
+  dailyTasksMaster = tasks;
+  await sb.from('sales_data').upsert({
+    store_key: 'daily_tasks_master',
+    filename: 'daily_tasks_master.json',
+    data_json: { tasks },
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser,
+  }, { onConflict: 'store_key' });
+}
+
+function openDailyTasksManager() {
+  renderDailyTasksMgrList();
+  document.getElementById('dailyTasksMgrModal').style.display = 'flex';
+}
+
+function closeDailyTasksMgr(e) {
+  if (e && e.currentTarget !== e.target) return;
+  document.getElementById('dailyTasksMgrModal').style.display = 'none';
+}
+
+function renderDailyTasksMgrList() {
+  const el = document.getElementById('dailyTasksMgrList');
+  if (!el) return;
+  const tasks = dailyTasksMaster || [];
+  el.innerHTML = tasks.length ? tasks.map((t, i) =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8f9fa;border-radius:8px;margin-bottom:5px">
+      <span style="flex:1;font-size:14px">${t}</span>
+      <button onclick="deleteDailyTaskMasterItem(${i})"
+        style="padding:3px 9px;background:#fee;color:#e74c3c;border:1px solid #f5c6c6;border-radius:6px;font-size:12px;cursor:pointer">削除</button>
+    </div>`).join('')
+    : '<div style="color:#aaa;font-size:13px;padding:8px">項目がありません</div>';
+}
+
+function deleteDailyTaskMasterItem(idx) {
+  if (!dailyTasksMaster) return;
+  dailyTasksMaster = dailyTasksMaster.filter((_, i) => i !== idx);
+  renderDailyTasksMgrList();
+}
+
+function addDailyTaskMasterItem() {
+  const input = document.getElementById('dailyTasksMgrInput');
+  const val = input?.value.trim();
+  if (!val) return;
+  if (!dailyTasksMaster) dailyTasksMaster = [];
+  if (dailyTasksMaster.includes(val)) { alert('すでに存在する業務名です'); return; }
+  dailyTasksMaster.push(val);
+  input.value = '';
+  renderDailyTasksMgrList();
+}
+
+async function saveDailyTasksMgrAndClose() {
+  const btn = document.getElementById('dailyTasksMgrSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
+  await saveDailyTasksMasterToSupabase(dailyTasksMaster || []);
+  document.getElementById('dailyTasksMgrModal').style.display = 'none';
+  if (btn) { btn.disabled = false; btn.textContent = '保存して閉じる'; }
+  renderDaily();
+}
+
 async function loadDailyFromSupabase(key) {
   try {
     const { data, error } = await sb.from('sales_data')
@@ -5501,13 +5609,10 @@ async function submitDailyReport(status = 'submitted') {
       i++;
     }
 
-    // 客数
-    const customers = {
-      total:      parseInt(document.getElementById('daily_cust_total')?.value)      || 0,
-      repeat:     parseInt(document.getElementById('daily_cust_repeat')?.value)     || 0,
-      subscribe:  parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0,
-      new_client: parseInt(document.getElementById('daily_cust_new_client')?.value) || 0,
-    };
+    // 客数（新規 + サブスク → 合計自動計算）
+    const new_client = parseInt(document.getElementById('daily_cust_new_client')?.value) || 0;
+    const subscribe  = parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0;
+    const customers = { new_client, subscribe, total: new_client + subscribe };
 
     // チェックされた業務
     const tasks = [];
