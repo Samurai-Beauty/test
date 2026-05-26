@@ -3052,7 +3052,8 @@ function saveMyReq(y, m, data) {
   all[currentUser] = data;
   localStorage.setItem(shiftKey('sreq', y, m), JSON.stringify(all));
   // Supabase保存はマージ方式（他スタッフの提出データを上書きしない）
-  const key = `${y}-${m}`;
+  // タイマーキーを管理者保存タイマー(${y}-${m})と分離して互いにキャンセルしないようにする
+  const key = `req_${y}-${m}`;
   clearTimeout(_shiftSaveTimers[key]);
   _shiftSaveTimers[key] = setTimeout(() => saveMyReqMerged(y, m), 1500);
 }
@@ -3073,13 +3074,11 @@ async function saveMyReqMerged(y, m) {
   // ssub: リモートを基準に currentUser のみ上書き
   const mergedSub = { ...(remote.ssub || {}) };
   if (isSubmitted(y, m, currentUser)) mergedSub[currentUser] = '1';
+  // スタッフの希望保存はsreq/ssubのみを更新し、管理者が編集したssched/times/storesは一切変更しない
   const payload = {
-    ssched:        remote.ssched        || getSched(y, m),
-    sreq:          mergedReq,
-    ssched_times:  remote.ssched_times  || getSchedTimes(y, m),
-    ssched_stores: remote.ssched_stores || getSchedStores(y, m),
-    spub:          remote.spub          || (isPublished(y, m) ? '1' : null),
-    ssub:          mergedSub,
+    ...(remote || {}),          // リモートの全フィールドをそのまま保持（ssched/times/stores/spub等）
+    sreq: mergedReq,            // 自分のsreqのみ上書き
+    ssub: mergedSub,            // ssub更新
   };
   await sb.from('sales_data').upsert({
     store_key: storeKey, filename: `${storeKey}.json`,
@@ -3091,8 +3090,8 @@ function isSubmitted(y, m, name) {
 }
 function markSubmitted(y, m, name) {
   localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, '1');
-  // マージ方式で保存（saveMyReqと同じタイマーキーを共有し常にmergedで保存）
-  const key = `${y}-${m}`;
+  // マージ方式で保存（saveMyReqと同じreqキーを使用し管理者タイマーとは分離）
+  const key = `req_${y}-${m}`;
   clearTimeout(_shiftSaveTimers[key]);
   _shiftSaveTimers[key] = setTimeout(() => saveMyReqMerged(y, m), 1500);
 }
@@ -3176,17 +3175,19 @@ async function saveShiftToSupabase(y, m) {
   const localSchedStores = getSchedStores(y, m);
 
   // ssched
-  // 「ローカルにその日のデータがある場合」のみローカル優先。
-  // ない場合はリモートを保持（高橋里奈など後から追加されたスタッフのデータ消失を防止）
+  // 「ローカルにその日のキーがある場合」のみローカル優先。
+  // ない場合はリモートを保持（他管理者や後から追加されたスタッフのデータ消失を防止）
+  // ※空配列 [] もキーが存在すれば「意図的にクリア」として扱う
   const mergedSched = {};
   new Set([...Object.keys(remoteSched), ...Object.keys(localSched)]).forEach(day => {
     const dayInLocal = day in localSched;
     const others  = (remoteSched[day] || []).filter(n => !managedSet.has(n));
     const managed = dayInLocal
-      ? (localSched[day] || []).filter(n => managedSet.has(n))  // ローカルが正
+      ? (localSched[day] || []).filter(n => managedSet.has(n))  // ローカルが正（空配列=意図的削除）
       : (remoteSched[day] || []).filter(n => managedSet.has(n)); // ローカル未記録→リモートを保持
     const merged = [...others, ...managed];
     if (merged.length > 0) mergedSched[day] = merged;
+    // merged が空の場合はキーを含めない（= その日は誰も出勤なし）
   });
 
   // schedTimes
@@ -3254,11 +3255,18 @@ async function loadShiftsFromSupabase() {
     const y = parseInt(parts[0]), m = parseInt(parts[1]);
     const d = row.data_json;
     if (!d) return;
-    // ssched/ssched_times/ssched_stores/spub はSupabaseを正として上書き（管理者データ）
-    if (d.ssched)        localStorage.setItem(shiftKey('ssched', y, m),        JSON.stringify(d.ssched));
-    if (d.ssched_times)  localStorage.setItem(shiftKey('ssched_times', y, m),  JSON.stringify(d.ssched_times));
-    if (d.ssched_stores) localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(d.ssched_stores));
-    if (d.spub)          localStorage.setItem(shiftKey('spub', y, m),          d.spub);
+    // ssched/ssched_times/ssched_stores/spub はSupabaseを正として上書き
+    // ただし保留中の保存タイマーがある月はlocalStorageを上書きしない（編集中データを保護）
+    const hasPendingSave = !!_shiftSaveTimers[`${y}-${m}`];
+    if (!hasPendingSave) {
+      if (d.ssched)        localStorage.setItem(shiftKey('ssched', y, m),        JSON.stringify(d.ssched));
+      if (d.ssched_times)  localStorage.setItem(shiftKey('ssched_times', y, m),  JSON.stringify(d.ssched_times));
+      if (d.ssched_stores) localStorage.setItem(shiftKey('ssched_stores', y, m), JSON.stringify(d.ssched_stores));
+      if (d.spub)          localStorage.setItem(shiftKey('spub', y, m),          d.spub);
+    } else {
+      // 編集中のためスケジュールは上書きしない。公開フラグだけリモートが '1' なら同期。
+      if (d.spub === '1') localStorage.setItem(shiftKey('spub', y, m), '1');
+    }
     // sreq は「リモートを基準に、currentUser の既存ローカルデータを保持」してマージ
     // ─ ログイン時にSupabaseの壊れたデータで自分の正しいデータが上書きされるのを防ぐ
     if (d.sreq) {
@@ -3815,18 +3823,19 @@ function removeSchedStaff(day, name) {
   const { y, m } = shiftManageMonth;
   const sched = getSched(y, m);
   sched[String(day)] = (sched[String(day)] || []).filter(n => n !== name);
-  if (!sched[String(day)].length) delete sched[String(day)];
+  // ← 空になってもキーを保持する。削除するとマージ時に「ローカル未記録→リモートを復元」と誤判定され
+  //   古いスタッフが復元されるバグの原因になる。
   saveSched(y, m, sched);
   const schedTimes  = getSchedTimes(y, m);
   if (schedTimes[String(day)]) {
     delete schedTimes[String(day)][name];
-    if (!Object.keys(schedTimes[String(day)]).length) delete schedTimes[String(day)];
+    // 同様にキーを保持（空オブジェクトでもOK）
     saveSchedTimes(y, m, schedTimes);
   }
   const schedStores = getSchedStores(y, m);
   if (schedStores[String(day)]) {
     delete schedStores[String(day)][name];
-    if (!Object.keys(schedStores[String(day)]).length) delete schedStores[String(day)];
+    // 同様にキーを保持
     saveSchedStores(y, m, schedStores);
   }
   renderManageSchedCal(y, m);
@@ -3921,12 +3930,10 @@ function confirmStaffModal() {
   document.querySelectorAll('#modalStaffList .modal-store-sel').forEach(sel => {
     if (selected.includes(sel.dataset.name) && sel.value) newDayStores[sel.dataset.name] = sel.value;
   });
-  if (selected.length > 0) sched[String(modalDay)] = selected;
-  else delete sched[String(modalDay)];
-  if (Object.keys(newDayTimes).length > 0) schedTimes[String(modalDay)] = newDayTimes;
-  else delete schedTimes[String(modalDay)];
-  if (Object.keys(newDayStores).length > 0) schedStores[String(modalDay)] = newDayStores;
-  else delete schedStores[String(modalDay)];
+  // 空でもキーを保持する（deleteするとマージ時に「ローカル未記録→リモートを復元」と誤判定されるバグ防止）
+  sched[String(modalDay)] = selected;
+  schedTimes[String(modalDay)]  = newDayTimes;
+  schedStores[String(modalDay)] = newDayStores;
   saveSched(y, m, sched);
   saveSchedTimes(y, m, schedTimes);
   saveSchedStores(y, m, schedStores);
@@ -3943,6 +3950,10 @@ function closeStaffModal(e) {
 async function doPublishShift() {
   const { y, m } = shiftManageMonth;
   if (!confirm(fmtMonth(y, m) + 'のシフトを公開しますか？')) return;
+  // 保留中のデバウンスタイマーをキャンセルして即座に確定保存（タイマー残留による上書きを防止）
+  const key = `${y}-${m}`;
+  clearTimeout(_shiftSaveTimers[key]);
+  delete _shiftSaveTimers[key];
   markPublished(y, m);
   try {
     await saveShiftToSupabase(y, m);
