@@ -3175,17 +3175,19 @@ async function saveShiftToSupabase(y, m) {
   const localSchedStores = getSchedStores(y, m);
 
   // ssched
-  // 「ローカルにその日のデータがある場合」のみローカル優先。
-  // ない場合はリモートを保持（高橋里奈など後から追加されたスタッフのデータ消失を防止）
+  // 「ローカルにその日のキーがある場合」のみローカル優先。
+  // ない場合はリモートを保持（他管理者や後から追加されたスタッフのデータ消失を防止）
+  // ※空配列 [] もキーが存在すれば「意図的にクリア」として扱う
   const mergedSched = {};
   new Set([...Object.keys(remoteSched), ...Object.keys(localSched)]).forEach(day => {
     const dayInLocal = day in localSched;
     const others  = (remoteSched[day] || []).filter(n => !managedSet.has(n));
     const managed = dayInLocal
-      ? (localSched[day] || []).filter(n => managedSet.has(n))  // ローカルが正
+      ? (localSched[day] || []).filter(n => managedSet.has(n))  // ローカルが正（空配列=意図的削除）
       : (remoteSched[day] || []).filter(n => managedSet.has(n)); // ローカル未記録→リモートを保持
     const merged = [...others, ...managed];
     if (merged.length > 0) mergedSched[day] = merged;
+    // merged が空の場合はキーを含めない（= その日は誰も出勤なし）
   });
 
   // schedTimes
@@ -3821,18 +3823,19 @@ function removeSchedStaff(day, name) {
   const { y, m } = shiftManageMonth;
   const sched = getSched(y, m);
   sched[String(day)] = (sched[String(day)] || []).filter(n => n !== name);
-  if (!sched[String(day)].length) delete sched[String(day)];
+  // ← 空になってもキーを保持する。削除するとマージ時に「ローカル未記録→リモートを復元」と誤判定され
+  //   古いスタッフが復元されるバグの原因になる。
   saveSched(y, m, sched);
   const schedTimes  = getSchedTimes(y, m);
   if (schedTimes[String(day)]) {
     delete schedTimes[String(day)][name];
-    if (!Object.keys(schedTimes[String(day)]).length) delete schedTimes[String(day)];
+    // 同様にキーを保持（空オブジェクトでもOK）
     saveSchedTimes(y, m, schedTimes);
   }
   const schedStores = getSchedStores(y, m);
   if (schedStores[String(day)]) {
     delete schedStores[String(day)][name];
-    if (!Object.keys(schedStores[String(day)]).length) delete schedStores[String(day)];
+    // 同様にキーを保持
     saveSchedStores(y, m, schedStores);
   }
   renderManageSchedCal(y, m);
@@ -3927,12 +3930,10 @@ function confirmStaffModal() {
   document.querySelectorAll('#modalStaffList .modal-store-sel').forEach(sel => {
     if (selected.includes(sel.dataset.name) && sel.value) newDayStores[sel.dataset.name] = sel.value;
   });
-  if (selected.length > 0) sched[String(modalDay)] = selected;
-  else delete sched[String(modalDay)];
-  if (Object.keys(newDayTimes).length > 0) schedTimes[String(modalDay)] = newDayTimes;
-  else delete schedTimes[String(modalDay)];
-  if (Object.keys(newDayStores).length > 0) schedStores[String(modalDay)] = newDayStores;
-  else delete schedStores[String(modalDay)];
+  // 空でもキーを保持する（deleteするとマージ時に「ローカル未記録→リモートを復元」と誤判定されるバグ防止）
+  sched[String(modalDay)] = selected;
+  schedTimes[String(modalDay)]  = newDayTimes;
+  schedStores[String(modalDay)] = newDayStores;
   saveSched(y, m, sched);
   saveSchedTimes(y, m, schedTimes);
   saveSchedStores(y, m, schedStores);
