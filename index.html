@@ -789,7 +789,8 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn-secondary" onclick="applyRequestsToSchedule()" style="font-size:13px;padding:8px 16px">📋 希望を反映</button>
               <button class="btn-primary" onclick="doPublishShift()">シフトを公開する</button>
-              <a href="bookmarklet.html" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:8px 14px;background:#1a5276;color:#fff;border:none;border-radius:8px;cursor:pointer;text-decoration:none;font-weight:600">🔗 SC同期</a>
+              <button onclick="startSalonConnectSync()" style="font-size:12px;padding:8px 14px;background:#1a5276;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">🔗 SC全員同期</button>
+              <a href="bookmarklet.html" target="_blank" style="font-size:11px;color:#888;text-decoration:underline;align-self:center">設定方法</a>
               <button id="btn-force-may2026" onclick="forceSaveMay2026()" style="display:none;font-size:12px;padding:8px 14px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer">🔄 5月シフトを復元</button>
             </div>
           </div>
@@ -1239,6 +1240,17 @@ const STORE_MEMBERS = {
   nishishinjuku: ['小川真央', '矢澤南奈', '清瀬陽香', '高橋里奈'],
   sanchome:      ['岡部実結', '沖中真奈', '三浦さら'],
   shibuya:       ['中山菜々江', '山本樹', '岡田颯太'],
+};
+
+// Salon Connect スタッフID対応表（sc-sync.js / sc-automate.user.js と共通）
+const SC_STAFF_IDS = {
+  '47848': { name: '小川真央',   shopId: '7701' },
+  '47849': { name: '矢澤南奈',   shopId: '7701' },
+  '48970': { name: '清瀬陽香',   shopId: '7701' },
+  '47850': { name: '高橋里奈',   shopId: '7701' },
+  '48969': { name: '岡部実結',   shopId: '7487' },
+  '48219': { name: '三浦さら',   shopId: '7487' },
+  '47851': { name: '中山菜々江', shopId: '7699' },
 };
 const HONSHA_MEMBERS = STORE_MEMBERS.honsha;
 const DEFAULT_MEMBERS = [
@@ -3964,6 +3976,67 @@ async function doPublishShift() {
     console.error('公開保存エラー:', e);
     alert('保存中にエラーが発生しました。もう一度お試しください。');
   }
+}
+
+// ── Salon Connect 全員自動同期 ──────────────────────────────────────────
+async function startSalonConnectSync() {
+  const { y, m } = shiftManageMonth;
+  const ym = `${y}${String(m).padStart(2, '0')}`;  // '202606'
+  const monthLabel = `${y}年${m}月`;
+
+  const staffIds = Object.keys(SC_STAFF_IDS);
+  const names = staffIds.map(id => SC_STAFF_IDS[id].name).join('、');
+
+  if (!confirm(
+    `【Salon Connect 全員同期】\n\n` +
+    `${monthLabel}のシフトを Salon Connect に自動入力します。\n\n` +
+    `対象(${staffIds.length}名): ${names}\n\n` +
+    `・Tampermonkey スクリプトが必要です\n` +
+    `・Salon Connect にログイン済みであることを確認してください\n\n` +
+    `続けますか？`
+  )) return;
+
+  // シフトデータを Supabase から取得（最新版）
+  const monthKey = `${y}-${m}`;
+  const { data: rows } = await sb.from('sales_data')
+    .select('data_json')
+    .eq('store_key', `shift_${monthKey}`)
+    .maybeSingle();
+
+  if (!rows?.data_json) {
+    alert(`${monthLabel}のシフトデータが見つかりません。\n先にシフトを保存・公開してください。`);
+    return;
+  }
+
+  const task = {
+    ym:        ym,
+    shiftData: rows.data_json,
+    staffIds:  staffIds,
+    status:    'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  const { error } = await sb.from('sales_data').upsert({
+    store_key:   'sc_sync_task',
+    filename:    'sc_sync_task.json',
+    data_json:   task,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || '',
+  }, { onConflict: 'store_key' });
+
+  if (error) {
+    alert('同期タスクの作成に失敗しました:\n' + error.message);
+    return;
+  }
+
+  // Salon Connect を新しいタブで開く（Tampermonkey が自動検知）
+  window.open('https://sc.salonconnect.jp/client_admin/', '_blank');
+
+  alert(
+    `✅ 同期タスクを設定しました！\n\n` +
+    `Salon Connect タブで Tampermonkey スクリプトが自動起動します。\n` +
+    `スクリプトが起動しない場合は bookmarklet.html の手順を確認してください。`
+  );
 }
 
 // 自動復元フラグ（このバージョンが保存されていれば再実行しない）

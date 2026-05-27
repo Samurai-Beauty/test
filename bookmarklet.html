@@ -3,178 +3,295 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>サムライ→SC同期 ブックマークレット設定</title>
+<title>サムライ↔SC同期 セットアップ</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
-         background: #f0f4f8; color: #1a1a2e; padding: 20px; }
-  .card { background: #fff; border-radius: 14px; padding: 24px; margin-bottom: 20px;
-          box-shadow: 0 2px 12px rgba(0,0,0,.08); max-width: 720px; margin-left: auto; margin-right: auto; }
-  h1 { font-size: 20px; font-weight: 800; color: #0f3460; margin-bottom: 6px; }
-  h2 { font-size: 15px; font-weight: 700; color: #0f3460; margin-bottom: 12px;
-       padding-bottom: 8px; border-bottom: 2px solid #e8edf5; }
-  p, li { font-size: 14px; line-height: 1.7; color: #444; }
-  ul, ol { padding-left: 20px; margin-top: 6px; }
-  li { margin-bottom: 4px; }
-  .step { display: flex; gap: 12px; margin-bottom: 14px; }
-  .step-num { width: 28px; height: 28px; min-width: 28px; border-radius: 50%;
-              background: #0f3460; color: #fff; font-weight: 700; font-size: 13px;
-              display: flex; align-items: center; justify-content: center; }
-  .step-body { flex: 1; }
-  .bm-link {
-    display: inline-block;
-    padding: 14px 28px;
-    background: linear-gradient(135deg, #0f3460, #1a5276);
-    color: #fff !important;
-    font-size: 16px;
-    font-weight: 700;
-    border-radius: 12px;
-    text-decoration: none;
-    cursor: grab;
-    box-shadow: 0 4px 16px rgba(15,52,96,.35);
-    margin: 12px 0;
-  }
-  .bm-link:hover { opacity: .9; }
-  .note { background: #fff8e1; border-left: 4px solid #f39c12; padding: 12px 16px;
-          border-radius: 0 8px 8px 0; font-size: 13px; color: #666; margin-top: 12px; }
-  .warn { background: #fef9f0; border-left: 4px solid #e67e22; }
-  .tag  { display: inline-block; background: #e8f0fe; color: #1a5276; font-size: 11px;
-          font-weight: 700; padding: 2px 7px; border-radius: 20px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
-  th, td { padding: 8px 10px; border: 1px solid #e8edf5; text-align: left; }
-  th { background: #f0f4f8; font-weight: 700; color: #0f3460; }
-  tr:hover td { background: #f8faff; }
-  code { background: #f0f4f8; padding: 1px 5px; border-radius: 4px; font-size: 12px;
-         font-family: 'Courier New', monospace; }
-  .back-btn { display: inline-block; padding: 8px 18px; background: #0f3460; color: #fff;
-              border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  background: #f0f4f8; color: #1a1a2e; padding: 16px;
+}
+.wrap { max-width: 740px; margin: 0 auto; }
+.card {
+  background: #fff; border-radius: 14px; padding: 22px 24px;
+  margin-bottom: 18px; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+}
+h1 { font-size: 19px; font-weight: 800; color: #0f3460; margin-bottom: 4px; }
+h2 {
+  font-size: 14px; font-weight: 700; color: #0f3460;
+  margin-bottom: 14px; padding-bottom: 8px;
+  border-bottom: 2px solid #e8edf5;
+}
+p, li { font-size: 13px; line-height: 1.75; color: #444; }
+ul, ol { padding-left: 18px; margin-top: 6px; }
+li { margin-bottom: 3px; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+.badge-auto { background: #e3f2fd; color: #0f3460; }
+.badge-manual { background: #f3e5f5; color: #6a1b9a; }
+.step { display: flex; gap: 14px; margin-bottom: 18px; }
+.step-n {
+  width: 30px; height: 30px; min-width: 30px; border-radius: 50%;
+  background: #0f3460; color: #fff; font-weight: 700; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.step-b { flex: 1; }
+.btn-install {
+  display: inline-block; padding: 12px 22px;
+  background: linear-gradient(135deg,#0f3460,#1a5276);
+  color: #fff; text-decoration: none; border-radius: 10px;
+  font-size: 14px; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15,52,96,.3);
+  margin: 10px 0 4px;
+}
+.btn-install:hover { opacity: .9; }
+.bm-link {
+  display: inline-block; padding: 12px 20px;
+  background: linear-gradient(135deg,#4a235a,#6a1b9a);
+  color: #fff; text-decoration: none; border-radius: 10px;
+  font-size: 14px; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(74,35,90,.3);
+  margin: 10px 0 4px; cursor: grab;
+}
+.bm-link:hover { opacity: .9; }
+.note {
+  background: #fff8e1; border-left: 4px solid #f39c12;
+  padding: 10px 14px; border-radius: 0 8px 8px 0;
+  font-size: 12px; color: #666; margin-top: 10px;
+}
+.warn {
+  background: #fef3cd; border-left-color: #e67e22;
+}
+.tip {
+  background: #e8f5e9; border-left: 4px solid #27ae60;
+  padding: 10px 14px; border-radius: 0 8px 8px 0;
+  font-size: 12px; color: #1e8449; margin-top: 10px;
+}
+code {
+  background: #f0f4f8; padding: 1px 5px; border-radius: 4px;
+  font-size: 11px; font-family: 'Courier New', monospace;
+}
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+th, td { padding: 7px 10px; border: 1px solid #e8edf5; text-align: left; }
+th { background: #f0f4f8; font-weight: 700; color: #0f3460; }
+tr:hover td { background: #f8faff; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.tag-ok  { background: #e8f5e9; color: #1e8449; }
+.tag-ng  { background: #fce4ec; color: #c0392b; }
+.flow {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; margin: 14px 0; font-size: 13px;
+}
+.flow-box {
+  padding: 8px 14px; border-radius: 8px; font-weight: 600;
+  border: 2px solid;
+}
+.flow-samurai { background: #e3f2fd; border-color: #0f3460; color: #0f3460; }
+.flow-sc      { background: #fce4ec; border-color: #c0392b; color: #c0392b; }
+.flow-auto    { background: #e8f5e9; border-color: #27ae60; color: #27ae60; }
+.arrow { font-size: 18px; color: #888; }
+.back-btn {
+  display: inline-block; padding: 8px 18px; background: #0f3460;
+  color: #fff; border-radius: 8px; text-decoration: none;
+  font-size: 13px; font-weight: 600;
+}
 </style>
 </head>
 <body>
+<div class="wrap">
 
+<!-- タイトル -->
 <div class="card">
-  <h1>📅 サムライ → Salon Connect シフト同期</h1>
-  <p style="color:#666;font-size:13px;margin-top:4px">
-    サムライシステムで作成・公開したシフトを、Salon Connectに自動入力するブックマークレットです。
+  <h1>📅 サムライ → Salon Connect シフト自動同期</h1>
+  <p style="color:#666;font-size:12px;margin-top:6px">
+    サムライシステムで公開したシフトを、Salon Connect に<strong>全スタッフ分まとめて自動入力</strong>するシステムです。
   </p>
+
+  <div class="flow" style="margin-top:16px">
+    <div class="flow-box flow-samurai">📋 サムライシステム<br><span style="font-size:11px;font-weight:400">「SC全員同期」をクリック</span></div>
+    <span class="arrow">→</span>
+    <div class="flow-box flow-sc">🔗 Salon Connect<br><span style="font-size:11px;font-weight:400">自動でタブが開く</span></div>
+    <span class="arrow">→</span>
+    <div class="flow-box flow-auto">✅ 全スタッフ<br><span style="font-size:11px;font-weight:400">自動入力・自動保存</span></div>
+  </div>
 </div>
 
-<!-- ブックマークレット本体 -->
+<!-- 方式選択 -->
 <div class="card">
-  <h2>▶ ブックマークレットを登録する</h2>
+  <h2>2つの方式</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="border:2px solid #27ae60;border-radius:10px;padding:14px;background:#f9fff9">
+      <div style="font-weight:700;font-size:14px;color:#1e8449;margin-bottom:6px">
+        ⭐ 方式A（推奨）<br>Tampermonkey
+      </div>
+      <p style="font-size:12px;color:#444">サムライで「SC全員同期」を押すだけで、Salon Connect が<strong>完全自動</strong>で全員分を入力・保存。</p>
+      <div style="margin-top:8px;font-size:11px;color:#1e8449;font-weight:600">
+        ✔ 初回のみ5分のセットアップ<br>
+        ✔ 以降はワンクリック<br>
+        ✔ 全員分まとめて自動保存
+      </div>
+    </div>
+    <div style="border:2px solid #9b59b6;border-radius:10px;padding:14px;background:#fdf7ff">
+      <div style="font-weight:700;font-size:14px;color:#6a1b9a;margin-bottom:6px">
+        方式B<br>ブックマークレット
+      </div>
+      <p style="font-size:12px;color:#444">Salon Connect でスタッフごとにブックマークをクリック。1名ずつ入力、保存は手動。</p>
+      <div style="margin-top:8px;font-size:11px;color:#888">
+        △ 1名ずつ操作が必要<br>
+        △ 保存ボタンは手動<br>
+        ○ セットアップが簡単
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 方式A：Tampermonkey -->
+<div class="card">
+  <h2>⭐ 方式A セットアップ（Tampermonkey）</h2>
 
   <div class="step">
-    <div class="step-num">1</div>
-    <div class="step-body">
-      <p><strong>下のボタンをブックマークバーにドラッグ＆ドロップ</strong>してください。</p>
-      <p style="font-size:12px;color:#888;margin-top:4px">
-        ブックマークバーが見えない場合: Chrome は <code>⌘ Shift B</code>（Mac）/ <code>Ctrl Shift B</code>（Windows）で表示できます。
+    <div class="step-n">1</div>
+    <div class="step-b">
+      <p><strong>Tampermonkey をインストール</strong></p>
+      <p style="font-size:12px;color:#666;margin-top:3px">Chrome 拡張機能。無料。一度入れれば完了。</p>
+      <a class="btn-install"
+         href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo"
+         target="_blank">Chrome に追加（Tampermonkey）</a>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">2</div>
+    <div class="step-b">
+      <p><strong>同期スクリプトをインストール</strong></p>
+      <p style="font-size:12px;color:#666;margin-top:3px">
+        下のボタンをクリックすると Tampermonkey がインストール画面を開きます。
       </p>
-
-      <a class="bm-link"
-         href="javascript:void(function(){var s=document.createElement('script');s.src='https://samurai-beauty.github.io/test/sc-sync.js?v='+Date.now();document.head.appendChild(s)}())">
-        📅 サムライ→SC同期
-      </a>
-
+      <a class="btn-install"
+         href="https://samurai-beauty.github.io/test/sc-automate.user.js"
+         target="_blank">📦 スクリプトをインストール</a>
       <div class="note">
-        このボタンをクリックしても動作しません。ブックマークバーへドラッグして登録してください。
+        ページが開いたら Tampermonkey の「インストール」ボタンを押してください。
+        ページが開かない場合は方式Bを使用してください。
       </div>
     </div>
   </div>
 
   <div class="step">
-    <div class="step-num">2</div>
-    <div class="step-body">
-      <p>登録後、<strong>Salon Connect のスタッフシフトページ</strong>で登録したブックマークレットをクリックします。</p>
-      <p style="font-size:12px;color:#888;margin-top:4px">
-        URL例: <code>sc.salonconnect.jp/client_admin/staff_day_shift.php?select_staff=47848&amp;yearmonth=202606</code>
+    <div class="step-n">3</div>
+    <div class="step-b">
+      <p><strong>Salon Connect にログインしておく</strong></p>
+      <p style="font-size:12px;color:#666;margin-top:3px">
+        同期実行前に <code>sc.salonconnect.jp</code> にブラウザからログイン済みにしてください。
       </p>
     </div>
   </div>
 
   <div class="step">
-    <div class="step-num">3</div>
-    <div class="step-body">
-      <p>シフトの<strong>プレビューダイアログ</strong>が表示されます。内容を確認してOKを押すとフォームが自動入力されます。</p>
+    <div class="step-n">4</div>
+    <div class="step-b">
+      <p><strong>サムライシステムで「🔗 SC全員同期」をクリック</strong></p>
+      <p style="font-size:12px;color:#666;margin-top:3px">
+        シフト管理 → シフト作成タブ → 月が合っているか確認 → 「SC全員同期」ボタン
+      </p>
+      <div class="tip">
+        Salon Connect のタブが自動で開き、Tampermonkey が全スタッフのシフトを順番に入力・保存します。<br>
+        完了まで<strong>操作不要</strong>です。
+      </div>
+    </div>
+  </div>
+
+  <div class="note warn" style="margin-top:4px">
+    ⚠️ 同期は<strong>公開済みシフト</strong>をもとに行います。「シフトを公開する」を先に押してから実行してください。
+  </div>
+</div>
+
+<!-- 方式B：ブックマークレット -->
+<div class="card">
+  <h2>方式B ブックマークレット（スタッフ別）</h2>
+
+  <div class="step">
+    <div class="step-n">1</div>
+    <div class="step-b">
+      <p><strong>下のボタンをブックマークバーにドラッグ</strong></p>
+      <a class="bm-link"
+         href="javascript:void(function(){var s=document.createElement('script');s.src='https://samurai-beauty.github.io/test/sc-sync.js?v='+Date.now();document.head.appendChild(s)}())">
+        📅 サムライ→SC同期（1名）
+      </a>
+      <div class="note">クリックでは動作しません。ブックマークバーへドラッグ&amp;ドロップしてください。</div>
     </div>
   </div>
 
   <div class="step">
-    <div class="step-num">4</div>
-    <div class="step-body">
-      <p>ページ下部の<strong>「保存する」ボタン</strong>を押して保存します。</p>
+    <div class="step-n">2</div>
+    <div class="step-b">
+      <p>Salon Connect でスタッフのシフトページを開き、ブックマークをクリック</p>
+      <p style="font-size:12px;color:#666;margin-top:3px">
+        URL例: <code>staff_day_shift.php?select_staff=47848&amp;yearmonth=202606</code>
+      </p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">3</div>
+    <div class="step-b">
+      <p>プレビューを確認 → OK → ページ下部の「保存する」を押す</p>
     </div>
   </div>
 </div>
 
-<!-- スタッフIDマッピング -->
+<!-- スタッフID対応表 -->
 <div class="card">
   <h2>👤 スタッフID対応表</h2>
-  <p style="font-size:13px;color:#666;margin-bottom:10px">
-    Salon Connect の <code>select_staff</code> パラメータと、サムライシステムの名前の対応です。
-    未登録のスタッフは <code>sc-sync.js</code> の <code>STAFF_MAP</code> に追記してください。
-  </p>
   <table>
     <thead>
-      <tr><th>Salon Connect スタッフID</th><th>サムライシステム名</th><th>店舗</th><th>状態</th></tr>
+      <tr><th>Salon Connect ID</th><th>名前</th><th>店舗</th><th>状態</th></tr>
     </thead>
     <tbody>
-      <tr><td>47848</td><td>小川真央</td><td>西新宿</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td>47849</td><td>矢澤南奈</td><td>西新宿</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td>48970</td><td>清瀬陽香</td><td>西新宿</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td>47850</td><td>高橋里奈</td><td>西新宿</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td>48969</td><td>岡部実結</td><td>三丁目</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td>48219</td><td>三浦さら</td><td>三丁目</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td>47851</td><td>中山菜々江</td><td>渋谷</td><td><span class="tag">登録済</span></td></tr>
-      <tr><td style="color:#aaa">—</td><td>沖中真奈</td><td>三丁目</td><td><span class="tag" style="background:#ffe8e8;color:#c0392b">要確認</span></td></tr>
-      <tr><td style="color:#aaa">—</td><td>山本樹</td><td>渋谷</td><td><span class="tag" style="background:#ffe8e8;color:#c0392b">要確認</span></td></tr>
-      <tr><td style="color:#aaa">—</td><td>岡田颯太</td><td>渋谷</td><td><span class="tag" style="background:#ffe8e8;color:#c0392b">要確認</span></td></tr>
+      <tr><td>47848</td><td>小川真央</td><td>西新宿</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td>47849</td><td>矢澤南奈</td><td>西新宿</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td>48970</td><td>清瀬陽香</td><td>西新宿</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td>47850</td><td>高橋里奈</td><td>西新宿</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td>48969</td><td>岡部実結</td><td>三丁目</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td>48219</td><td>三浦さら</td><td>三丁目</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td>47851</td><td>中山菜々江</td><td>渋谷</td><td><span class="tag tag-ok">登録済</span></td></tr>
+      <tr><td style="color:#aaa">—</td><td>沖中真奈</td><td>三丁目</td><td><span class="tag tag-ng">ID未確認</span></td></tr>
+      <tr><td style="color:#aaa">—</td><td>山本樹</td><td>渋谷</td><td><span class="tag tag-ng">ID未確認</span></td></tr>
+      <tr><td style="color:#aaa">—</td><td>岡田颯太</td><td>渋谷</td><td><span class="tag tag-ng">ID未確認</span></td></tr>
     </tbody>
   </table>
-  <div class="note warn" style="margin-top:12px">
-    「要確認」のスタッフは Salon Connect にアカウントがない可能性があります。<br>
-    IDを確認した場合は <strong>GitHub で <code>sc-sync.js</code> を編集</strong>し <code>STAFF_MAP</code> に追加してください。
+  <div class="note" style="margin-top:10px">
+    「ID未確認」のスタッフのシフトページを Salon Connect で開き、URLの
+    <code>select_staff=XXXXX</code> の番号を確認してお知らせください。
+    <code>sc-sync.js</code> と <code>sc-automate.user.js</code> の <code>STAFF_MAP</code> に追記します。
   </div>
 </div>
 
-<!-- シフト時間マッピング -->
+<!-- シフト時間変換 -->
 <div class="card">
-  <h2>⏰ シフト時間の変換表</h2>
+  <h2>⏰ シフト時間 変換表</h2>
   <table>
     <thead>
-      <tr><th>サムライ シフトキー</th><th>表示名</th><th>Salon Connect パターンID</th><th>備考</th></tr>
+      <tr><th>サムライ</th><th>時間</th><th>SC パターンID</th><th>SC 表示</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>early</code></td><td>13:00-18:00（早番）</td><td>14777（13〜18）</td><td>完全一致</td></tr>
-      <tr><td><code>full</code></td><td>13:00-22:00（フル）</td><td>14778（13〜22）</td><td>完全一致</td></tr>
-      <tr><td><code>h11-22</code></td><td>11:00-22:00</td><td>14775（11〜22）</td><td>完全一致</td></tr>
-      <tr><td><code>late</code></td><td>16:00-22:00（遅番）</td><td>14780（17〜22）</td><td>近似値※</td></tr>
-      <tr><td><code>h11-17</code></td><td>11:00-17:00</td><td>14776（11〜18）</td><td>近似値</td></tr>
-      <tr><td><code>omakase</code></td><td>お任せ</td><td>1（全日）</td><td>—</td></tr>
-      <tr><td><code>off</code></td><td>休日希望</td><td>—（休み）</td><td>closed=1</td></tr>
+      <tr><td><code>early</code></td><td>13:00-18:00</td><td>14777</td><td>13〜18 ✓</td></tr>
+      <tr><td><code>full</code></td><td>13:00-22:00</td><td>14778</td><td>13〜22 ✓</td></tr>
+      <tr><td><code>h11-22</code></td><td>11:00-22:00</td><td>14775</td><td>11〜22 ✓</td></tr>
+      <tr><td><code>late</code></td><td>16:00-22:00</td><td>14780</td><td>17〜22 ※近似</td></tr>
+      <tr><td><code>h11-17</code></td><td>11:00-17:00</td><td>14776</td><td>11〜18 ※近似</td></tr>
+      <tr><td><code>omakase</code></td><td>お任せ</td><td>1</td><td>全日</td></tr>
+      <tr><td><code>off</code></td><td>休み</td><td>—</td><td>closed=1</td></tr>
     </tbody>
   </table>
-  <div class="note" style="margin-top:12px">
-    ※ 「遅番」(16:00-22:00) は Salon Connect に完全一致するパターンがないため 17〜22 を使用します。
-    実際の運用に合わせて <code>sc-sync.js</code> の <code>SHIFT_ID_MAP</code> を修正してください。
-  </div>
-</div>
-
-<!-- 注意事項 -->
-<div class="card">
-  <h2>⚠️ 注意事項</h2>
-  <ul style="font-size:14px;line-height:2">
-    <li>サムライシステムで<strong>シフトを公開済み</strong>の状態で実行してください（未公開だと「スキップ」が多くなります）。</li>
-    <li>ブックマークレット実行後、必ず<strong>「保存する」ボタン</strong>を押してください。自動保存はしません。</li>
-    <li>既存のSalon Connectシフトは上書きされます。<strong>既存データのバックアップ</strong>が必要な場合は先に手動でコピーしてください。</li>
-    <li>1スタッフ1ヶ月ごとに実行が必要です。全スタッフ分繰り返してください。</li>
-    <li>スクリプトは GitHub Pages (<code>sc-sync.js</code>) から毎回読み込まれるため、<strong>スクリプトを更新すれば再登録不要</strong>です。</li>
-  </ul>
 </div>
 
 <div class="card" style="text-align:center">
   <a href="https://samurai-beauty.github.io/test/" class="back-btn">← サムライシステムに戻る</a>
 </div>
 
+</div><!-- .wrap -->
 </body>
 </html>
