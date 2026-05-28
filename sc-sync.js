@@ -76,7 +76,7 @@
   var year     = ymStr.slice(0, 4);
   var monthPad = ymStr.slice(4, 6);           // '06'
   var monthInt = parseInt(monthPad, 10);       // 6
-  var monthKey = parseInt(year, 10) + '-' + monthInt; // 'shift_2026-6'
+  var monthKey = parseInt(year, 10) + '-' + monthPad; // 'shift_2026-06' 形式
   var supabaseKey = 'shift_' + monthKey;
 
   // ── Supabase からシフトデータ取得 ─────────────────────────────────────

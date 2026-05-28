@@ -3998,7 +3998,7 @@ async function startSalonConnectSync() {
   )) return;
 
   // シフトデータを Supabase から取得（最新版）
-  const monthKey = `${y}-${m}`;
+  const monthKey = `${y}-${String(m).padStart(2, '0')}`;  // 'shift_2026-07' 形式で一致させる
   const { data: rows } = await sb.from('sales_data')
     .select('data_json')
     .eq('store_key', `shift_${monthKey}`)
