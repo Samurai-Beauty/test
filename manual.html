@@ -242,7 +242,17 @@
 
 
 <!-- ========== PAGE 2: 本社向け ========== -->
-<div class="page">
+<div class="page" id="page2">
+<style>
+  #page2 .section { margin-bottom: 4px; }
+  #page2 hr.divider { margin: 3px 0; }
+  #page2 .card { padding: 4px 7px; }
+  #page2 .step { margin-bottom: 1px; }
+  #page2 .note { margin-top: 2px; padding: 2px 6px; }
+  #page2 .card h3 { margin-bottom: 3px; padding-bottom: 2px; }
+  #page2 .card ul li { margin-bottom: 0; }
+  #page2 .card p { margin-bottom: 1px; }
+</style>
 
   <div class="doc-header">
     <h1>⚔️ Samurai System &nbsp; 操作マニュアル</h1>
@@ -256,23 +266,21 @@
       <div class="card">
         <h3>📋 シフト希望の確認と反映</h3>
         <div class="step"><div class="step-num purple">1</div><div class="step-text">「シフト管理」→「シフト希望一覧」タブで全員の希望を確認</div></div>
-        <div class="step"><div class="step-num purple">2</div><div class="step-text">「シフト作成」タブに切り替え、「希望を反映」で自動配置</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">「シフト作成」タブ→「希望を反映」で自動配置</div></div>
         <div class="step"><div class="step-num purple">3</div><div class="step-text">日付をタップしてスタッフを追加・削除・時間調整</div></div>
         <div class="step"><div class="step-num purple">4</div><div class="step-text">「シフトを公開する」でスタイリストに公開</div></div>
-        <div class="note"><strong>赤枠の日</strong> = 早番または遅番が不足。解消してから公開してください</div>
+        <div class="note"><strong>赤枠の日</strong> = 早番または遅番が不足。解消してから公開</div>
         <hr class="divider">
         <h3>🔗 SC全員同期（Salon Connect 自動入力）</h3>
-        <div class="step"><div class="step-num purple">1</div><div class="step-text">シフトを<strong>公開済み</strong>にしてから実行</div></div>
-        <div class="step"><div class="step-num purple">2</div><div class="step-text">「🔗 SC全員同期」ボタンをクリック → SCのタブが自動で開く</div></div>
-        <div class="step"><div class="step-num purple">3</div><div class="step-text">スクリプトが全スタッフ（7名）を順番に自動入力・保存</div></div>
-        <div class="note warn">⚠️ 処理中はタブを閉じないこと。完了まで約1〜2分</div>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">シフト<strong>公開後</strong>に「🔗 SC全員同期」をクリック</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">SCタブが開き、全スタッフ（7名）を順番に自動入力・保存</div></div>
+        <div class="note warn">⚠️ 完了まで約1〜2分。処理中はタブを閉じないこと</div>
       </div>
       <div class="card">
         <h3>✏️ イレギュラーなシフト時間</h3>
         <div class="step"><div class="step-num purple">1</div><div class="step-text">スタッフ選択モーダルで時間ドロップダウンを開く</div></div>
-        <div class="step"><div class="step-num purple">2</div><div class="step-text">「✏️ 任意時間を入力...」を選択</div></div>
-        <div class="step"><div class="step-num purple">3</div><div class="step-text">時間を入力（例: <strong>11:00-14:00</strong>）</div></div>
-        <div class="note"><span class="badge badge-purple">紫色</span>で表示。本社専用（スタイリスト提出不可）</div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">「✏️ 任意時間を入力...」を選択して時間を入力（例: <strong>11:00-14:00</strong>）</div></div>
+        <div class="note"><span class="badge badge-purple">紫色</span>表示。本社専用（スタイリスト提出不可）</div>
         <hr class="divider">
         <h3>🏪 複数店舗の管理</h3>
         <ul>
@@ -300,13 +308,13 @@
           <li><strong>⑥ 実施業務</strong> — 当日の実施内容を自由記入</li>
           <li><strong>⑦ 備考</strong> — その他連絡事項</li>
         </ul>
-        <div class="note">「保存する」ボタンで送信。本社で一覧確認できます</div>
+        <div class="note">「保存する」で送信。本社で一覧確認できます</div>
       </div>
       <div class="card">
         <h3>④ サブスク契約詳細</h3>
-        <div class="step"><div class="step-num purple">1</div><div class="step-text">「サブスク契約数」で件数を選択 → 入力欄が展開</div></div>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">件数を選択 → 入力欄が展開</div></div>
         <div class="step"><div class="step-num purple">2</div><div class="step-text">各行に <strong>氏名</strong> と <strong>契約プラン</strong> を入力</div></div>
-        <div class="note" style="margin-top:3px">
+        <div class="note" style="margin-top:2px">
           <span class="badge badge-blue">ツキイチ</span>
           <span class="badge badge-green">ライト</span>
           <span class="badge badge-orange">スタンダード</span>
@@ -314,7 +322,7 @@
         </div>
         <hr class="divider">
         <h3>⑤ サブスク解約件数</h3>
-        <div class="step"><div class="step-num purple">1</div><div class="step-text">「サブスク解約件数」で件数を選択 → 氏名欄が展開</div></div>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">件数を選択 → 解約者の氏名欄が展開</div></div>
         <div class="step"><div class="step-num purple">2</div><div class="step-text">解約者の氏名を各行に入力</div></div>
       </div>
     </div>
@@ -327,7 +335,7 @@
     <div class="cols">
       <div>
         <div class="section-title honsha">📢 お知らせの投稿</div>
-        <div class="card" style="margin-top:5px">
+        <div class="card" style="margin-top:4px">
           <div class="step"><div class="step-num purple">1</div><div class="step-text">「お知らせ」→「編集・投稿」タブ</div></div>
           <div class="step"><div class="step-num purple">2</div><div class="step-text">タイトル・内容・対象店舗を入力</div></div>
           <div class="step"><div class="step-num purple">3</div><div class="step-text">「ピン留め」「予約投稿」を必要に応じてチェック</div></div>
@@ -336,7 +344,7 @@
       </div>
       <div>
         <div class="section-title honsha">👥 スタイリスト管理</div>
-        <div class="card" style="margin-top:5px">
+        <div class="card" style="margin-top:4px">
           <div class="step"><div class="step-num purple">1</div><div class="step-text">名前・配属店舗・初期パスワードを入力して「追加」</div></div>
           <div class="step"><div class="step-num purple">2</div><div class="step-text">追加後も一覧から店舗を変更可能</div></div>
           <div class="step"><div class="step-num purple">3</div><div class="step-text">初期パスワードを本人に伝え、本人がプロフィールから変更</div></div>
