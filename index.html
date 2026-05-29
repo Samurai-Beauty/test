@@ -5363,9 +5363,20 @@ async function renderDaily() {
       </div>
     </div>`;
 
-    html += `<div style="padding:10px 14px;background:#f0f4ff;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <span style="font-weight:700;font-size:13px;color:#8e44ad">💳 サブスク契約数</span>
-      <span style="font-size:20px;font-weight:700;color:#8e44ad">${existing.subscribe_contracts||0}<span style="font-size:13px">件</span></span>
+    html += `<div style="padding:10px 14px;background:#f8f0ff;border-radius:10px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:13px;color:#8e44ad">💳 サブスク契約数</span>
+        <span style="font-size:20px;font-weight:700;color:#8e44ad">${existing.subscribe_contracts||0}<span style="font-size:13px">件</span></span>
+      </div>
+      ${(existing.contract_details?.length ? `
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
+          ${existing.contract_details.map((d,i) => `
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#555">
+              <span style="color:#8e44ad;font-weight:700">${i+1}</span>
+              <span style="font-weight:600">${d.name||'—'}</span>
+              ${d.plan ? `<span style="background:#e0c8f8;color:#6c3483;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700">${d.plan}</span>` : ''}
+            </div>`).join('')}
+        </div>` : '')}
     </div>`;
 
     if (existing.tasks?.length) {
@@ -5456,14 +5467,22 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
   </div>`;
 
   // ④ サブスク契約数
+  const existingContracts = existing?.contract_details || [];
   html += `<div style="margin-bottom:18px">
     <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④ サブスク契約数</div>
     <div style="display:flex;align-items:center;gap:8px;background:#f8f9fa;border-radius:10px;padding:12px">
       <input type="number" min="0" value="${existing?.subscribe_contracts??''}" id="daily_subscribe_contracts"
+        oninput="updateContractRows(parseInt(this.value)||0)"
         style="width:120px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:16px;text-align:right">
       <span style="color:#888">件</span>
     </div>
+    <div id="daily_contract_rows" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
   </div>`;
+
+  // 契約詳細の初期行を生成するスクリプト（レンダリング後に呼び出す）
+  const initContractCount = existing?.subscribe_contracts || 0;
+  const initContractData = JSON.stringify(existingContracts).replace(/</g,'\\u003c');
+  html += `<script>setTimeout(function(){updateContractRows(${initContractCount},${initContractData})},0);<\/script>`;
 
   // ⑤ 実施業務
   const doneTasks = existing?.tasks || [];
@@ -5532,6 +5551,59 @@ function dailyCalcTotal() {
   const s = parseInt(document.getElementById('daily_cust_subscribe')?.value)  || 0;
   const el = document.getElementById('dailyTotalDisplay');
   if (el) el.innerHTML = `${n + s}<span style="font-size:13px;margin-left:3px">名</span>`;
+}
+
+const SUBSCRIBE_PLANS = ['ツキイチ', 'ライト', 'スタンダード', 'プレミアム'];
+
+function updateContractRows(count, existingData) {
+  const container = document.getElementById('daily_contract_rows');
+  if (!container) return;
+  if (count <= 0) { container.innerHTML = ''; return; }
+
+  // 既存行のデータを保持
+  const current = [];
+  container.querySelectorAll('.contract-row').forEach(row => {
+    current.push({
+      name: row.querySelector('.cr-name')?.value || '',
+      plan: row.querySelector('.cr-plan')?.value || '',
+    });
+  });
+
+  container.innerHTML = '';
+  const planOpts = SUBSCRIBE_PLANS.map(p => `<option value="${p}">${p}</option>`).join('');
+
+  for (let i = 0; i < count; i++) {
+    const saved = (existingData && existingData[i]) || current[i] || {};
+    const nameVal = saved.name || '';
+    const planVal = saved.plan || '';
+    const row = document.createElement('div');
+    row.className = 'contract-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;background:#f8f0ff;border-radius:8px;padding:8px 10px;border:1px solid #e0c8f8';
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;font-weight:700;color:#8e44ad;min-width:18px">${i+1}</span>
+        <input class="cr-name" type="text" placeholder="氏名" value="${nameVal.replace(/"/g,'&quot;')}"
+          style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <select class="cr-plan"
+          style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#333">
+          <option value="">プラン選択</option>
+          ${SUBSCRIBE_PLANS.map(p => `<option value="${p}"${p===planVal?' selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+      <button type="button" onclick="removeContractRow(this)"
+        style="padding:4px 8px;background:none;border:1px solid #e0c8f8;border-radius:6px;color:#aaa;font-size:12px;cursor:pointer">✕</button>
+    `;
+    container.appendChild(row);
+  }
+}
+
+function removeContractRow(btn) {
+  const row = btn.closest('.contract-row');
+  if (!row) return;
+  row.remove();
+  // カウント入力欄も更新
+  const inp = document.getElementById('daily_subscribe_contracts');
+  if (inp) inp.value = Math.max(0, parseInt(inp.value||0) - 1);
 }
 
 function dailyAddShift() {
@@ -5718,6 +5790,13 @@ async function submitDailyReport(status = 'submitted') {
       staff_shifts:        shifts,
       customers,
       subscribe_contracts: parseInt(document.getElementById('daily_subscribe_contracts')?.value) || 0,
+      contract_details: (() => {
+        const rows = document.querySelectorAll('#daily_contract_rows .contract-row');
+        return Array.from(rows).map(r => ({
+          name: r.querySelector('.cr-name')?.value.trim() || '',
+          plan: r.querySelector('.cr-plan')?.value || '',
+        })).filter(d => d.name || d.plan);
+      })(),
       tasks,
       memo:                document.getElementById('daily_memo')?.value.trim() || '',
       submitted_by:        currentUser,
