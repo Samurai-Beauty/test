@@ -5381,7 +5381,7 @@ async function renderDaily() {
     ${(existing.cancel_count > 0 ? `
     <div style="padding:10px 14px;background:#fff0f0;border-radius:10px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:13px;color:#c0392b">🚫 解約件数</span>
+        <span style="font-weight:700;font-size:13px;color:#c0392b">🚫 サブスク解約件数</span>
         <span style="font-size:20px;font-weight:700;color:#c0392b">${existing.cancel_count}<span style="font-size:13px">件</span></span>
       </div>
       ${(existing.cancel_details?.length ? `
@@ -5499,12 +5499,12 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
   const initContractData = JSON.stringify(existingContracts).replace(/</g,'\\u003c');
   html += `<script>setTimeout(function(){updateContractRows(${initContractCount},${initContractData})},0);<\/script>`;
 
-  // ④-2 解約件数
+  // ⑤ サブスク解約件数
   const existingCancels = existing?.cancel_details || [];
   const initCancelCount = existing?.cancel_count || 0;
   const initCancelData = JSON.stringify(existingCancels).replace(/</g,'\\u003c');
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">④-2 解約件数</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑤ サブスク解約件数</div>
     <div style="display:flex;align-items:center;gap:8px;background:#f8f9fa;border-radius:10px;padding:12px">
       <input type="number" min="0" value="${initCancelCount||''}" id="daily_cancel_count"
         oninput="updateCancelRows(parseInt(this.value)||0)"
@@ -5515,12 +5515,12 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
   </div>`;
   html += `<script>setTimeout(function(){updateCancelRows(${initCancelCount},${initCancelData})},0);<\/script>`;
 
-  // ⑤ 実施業務
+  // ⑥ 実施業務
   const doneTasks = existing?.tasks || [];
   const masterTasks = dailyTasksMaster || DAILY_TASKS_DEFAULT;
   html += `<div style="margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="font-weight:700;font-size:14px;color:#1a1a2e">⑤ 実施業務（該当するものにチェック）</div>
+      <div style="font-weight:700;font-size:14px;color:#1a1a2e">⑥ 実施業務（該当するものにチェック）</div>
       ${(currentStore === 'honsha' || isManagerRole(currentUser, currentStore)) ? `<button onclick="openDailyTasksManager()" style="padding:4px 10px;background:#f0f4ff;color:#0f3460;border:1px solid #c0d0ff;border-radius:6px;font-size:12px;cursor:pointer">⚙️ 項目管理</button>` : ''}
     </div>
     <div style="display:flex;flex-direction:column;gap:6px" id="dailyTaskList">`;
@@ -5538,9 +5538,9 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
     </div>
   </div>`;
 
-  // ⑥ 備考
+  // ⑦ 備考
   html += `<div style="margin-bottom:18px">
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑥ 備考・メモ（任意）</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1a1a2e">⑦ 備考・メモ（任意）</div>
     <textarea id="daily_memo" rows="3" placeholder="特記事項など..."
       style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical">${existing?.memo||''}</textarea>
   </div>`;
