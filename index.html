@@ -1003,6 +1003,20 @@
           <div class="card-title">📋 資料一覧</div>
           <div id="docList"><div style="color:#aaa;font-size:13px;text-align:center;padding:20px">読み込み中...</div></div>
         </div>
+
+        <!-- フォルダ移動モーダル（本社のみ使用） -->
+        <div id="docMoveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center">
+          <div style="background:white;border-radius:14px;padding:24px;width:340px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
+            <div style="font-size:16px;font-weight:700;margin-bottom:10px">📂 フォルダを移動</div>
+            <div id="docMoveFileName" style="font-size:13px;color:#555;margin-bottom:14px;word-break:break-all;padding:8px 10px;background:#f8f9fa;border-radius:6px"></div>
+            <label style="font-size:12px;color:#555;display:block;margin-bottom:5px">移動先カテゴリ</label>
+            <select id="docMoveCategorySelect" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:18px;box-sizing:border-box;background:white"></select>
+            <div style="display:flex;gap:8px">
+              <button onclick="applyMoveDocument()" style="flex:1;padding:11px;background:#0f3460;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">移動する</button>
+              <button onclick="closeMoveModal()" style="flex:1;padding:11px;background:#f0f0f0;color:#333;border:none;border-radius:8px;font-size:14px;cursor:pointer">キャンセル</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ====== プロフィール ====== -->
@@ -1645,6 +1659,7 @@ function renderDocuments() {
         </div>
         <div style="display:flex;gap:6px;margin-left:10px;flex-shrink:0">
           <a href="${f.url}" target="_blank" rel="noopener" style="padding:5px 12px;border-radius:6px;border:1.5px solid #0f3460;color:#0f3460;background:white;cursor:pointer;font-size:12px;text-decoration:none;white-space:nowrap">開く</a>
+          ${isHonsha ? `<button onclick="showMoveModal('${f.id}')" style="padding:5px 10px;border-radius:6px;border:1.5px solid #8e44ad;color:#8e44ad;background:white;cursor:pointer;font-size:12px">移動</button>` : ''}
           ${isHonsha ? `<button onclick="deleteDocument('${f.id}')" style="padding:5px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : ''}
         </div>
       </div>`;
@@ -1728,6 +1743,36 @@ async function deleteDocument(id) {
   await sb.storage.from('documents').remove([f.path]);
   docMeta.files.splice(idx, 1);
   await saveDocuments();
+  renderDocuments();
+}
+
+let _movingDocId = null;
+
+function showMoveModal(id) {
+  const f = docMeta.files.find(f => f.id === id);
+  if (!f) return;
+  const targets = docMeta.categories.filter(c => c !== f.category);
+  if (targets.length === 0) { alert('移動先のカテゴリがありません。\n先にカテゴリを追加してください。'); return; }
+  _movingDocId = id;
+  document.getElementById('docMoveFileName').textContent = f.name;
+  const sel = document.getElementById('docMoveCategorySelect');
+  sel.innerHTML = targets.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('docMoveModal').style.display = 'flex';
+}
+
+function closeMoveModal() {
+  _movingDocId = null;
+  document.getElementById('docMoveModal').style.display = 'none';
+}
+
+async function applyMoveDocument() {
+  if (!_movingDocId) return;
+  const newCat = document.getElementById('docMoveCategorySelect').value;
+  const idx = docMeta.files.findIndex(f => f.id === _movingDocId);
+  if (idx === -1) { closeMoveModal(); return; }
+  docMeta.files[idx].category = newCat;
+  await saveDocuments();
+  closeMoveModal();
   renderDocuments();
 }
 
