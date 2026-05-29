@@ -1,0 +1,30 @@
+name: Python syntax check
+
+on:
+  pull_request:
+    paths:
+      - '**.py'
+      - '.github/workflows/python-syntax.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**.py'
+      - '.github/workflows/python-syntax.yml'
+
+jobs:
+  py_compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile all Python files
+        run: |
+          shopt -s globstar nullglob
+          files=( **/*.py )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No Python files found."
+            exit 0
+          fi
+          python -m py_compile "${files[@]}"
