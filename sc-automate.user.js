@@ -200,15 +200,28 @@
   }
 
   function clickSave() {
+    // セレクター順に保存ボタンを探す
     var sels = [
       'input[type="submit"][value*="保存"]',
       'button[type="submit"]',
       'input[type="submit"]',
+      'button[onclick*="submit"]',
     ];
     for (var i = 0; i < sels.length; i++) {
       var el = document.querySelector(sels[i]);
       if (el) { el.click(); return true; }
     }
+    // テキストで "保存" を含むボタンを探す
+    var allBtns = document.querySelectorAll('button, input[type="button"]');
+    for (var j = 0; j < allBtns.length; j++) {
+      if (allBtns[j].textContent.includes('保存') || (allBtns[j].value || '').includes('保存')) {
+        allBtns[j].click();
+        return true;
+      }
+    }
+    // 最終手段: フォームを直接送信
+    var form = document.getElementById('jsubmit_form') || document.querySelector('form[method="post"]');
+    if (form) { form.submit(); return true; }
     return false;
   }
 
