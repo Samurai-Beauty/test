@@ -15,11 +15,16 @@
 
   /* ===== ページ制御 ===== */
   .page {
-    width: 210mm; height: 297mm; padding: 9mm 11mm;
+    width: 210mm; height: 296mm; padding: 9mm 11mm;
     page-break-after: always; position: relative;
     overflow: hidden;
   }
   .page:last-child { page-break-after: avoid; }
+  @media print {
+    /* A4印刷時の末尾空白ページを防止（高さをぴったり297mmにせず余白を確保） */
+    .page { height: 285mm; }
+    .page:last-child { page-break-after: avoid; }
+  }
 
   /* ===== ヘッダー ===== */
   .doc-header {
