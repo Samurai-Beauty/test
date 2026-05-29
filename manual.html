@@ -244,14 +244,21 @@
 <!-- ========== PAGE 2: 本社向け ========== -->
 <div class="page" id="page2">
 <style>
-  #page2 .section { margin-bottom: 4px; }
-  #page2 hr.divider { margin: 3px 0; }
-  #page2 .card { padding: 4px 7px; }
+  #page2 { font-size: 8pt; }
+  #page2 .section { margin-bottom: 3px; }
+  #page2 hr.divider { display: none; }
+  #page2 .card { padding: 4px 6px; }
+  #page2 .card h3 { font-size: 8pt; margin-bottom: 2px; padding-bottom: 1px; margin-top: 4px; }
+  #page2 .card h3:first-child { margin-top: 0; }
   #page2 .step { margin-bottom: 1px; }
-  #page2 .note { margin-top: 2px; padding: 2px 6px; }
-  #page2 .card h3 { margin-bottom: 3px; padding-bottom: 2px; }
-  #page2 .card ul li { margin-bottom: 0; }
-  #page2 .card p { margin-bottom: 1px; }
+  #page2 .step-text { font-size: 7.5pt; }
+  #page2 .note { margin-top: 1px; padding: 2px 5px; font-size: 7pt; }
+  #page2 .card ul li { font-size: 7.5pt; margin-bottom: 0; }
+  #page2 .card p { font-size: 7.5pt; margin-bottom: 0; }
+  #page2 .cols { gap: 5px; }
+  #page2 .cols3 { gap: 4px; }
+  #page2 .section-title { margin-bottom: 3px; }
+  #page2 .doc-header { padding-bottom: 4px; margin-bottom: 6px; }
 </style>
 
   <div class="doc-header">
@@ -291,8 +298,6 @@
     </div>
   </div>
 
-  <hr class="divider">
-
   <!-- 日報 -->
   <div class="section">
     <div class="section-title honsha">📝 日報の記入</div>
@@ -328,8 +333,6 @@
     </div>
   </div>
 
-  <hr class="divider">
-
   <!-- お知らせ + スタイリスト管理 -->
   <div class="section">
     <div class="cols">
@@ -353,8 +356,6 @@
       </div>
     </div>
   </div>
-
-  <hr class="divider">
 
   <!-- トラブルシューティング -->
   <div class="section">
