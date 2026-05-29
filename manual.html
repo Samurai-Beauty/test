@@ -124,7 +124,7 @@
 
   <div class="doc-header">
     <h1>⚔️ Samurai System &nbsp; 操作マニュアル</h1>
-    <div class="sub">スタイリスト向け<br>ver. 2026.05</div>
+    <div class="sub">スタイリスト向け<br>ver. 2026.06</div>
   </div>
 
   <!-- ログイン -->
@@ -246,7 +246,7 @@
 
   <div class="doc-header">
     <h1>⚔️ Samurai System &nbsp; 操作マニュアル</h1>
-    <div class="sub">本社・管理者向け<br>ver. 2026.05</div>
+    <div class="sub">本社・管理者向け<br>ver. 2026.06</div>
   </div>
 
   <!-- シフト管理 -->
@@ -358,7 +358,112 @@
 
   <div class="doc-footer">
     <span>Samurai System 操作マニュアル — 本社・管理者向け</span>
-    <span>samurai-beauty.github.io/test &nbsp;|&nbsp; 2 / 2</span>
+    <span>samurai-beauty.github.io/test &nbsp;|&nbsp; 2 / 3</span>
+  </div>
+</div>
+
+
+<!-- ========== PAGE 3: 日報・SC同期 ========== -->
+<div class="page">
+
+  <div class="doc-header">
+    <h1>⚔️ Samurai System &nbsp; 操作マニュアル</h1>
+    <div class="sub">日報・SC同期（管理者向け）<br>ver. 2026.06</div>
+  </div>
+
+  <!-- 日報 -->
+  <div class="section">
+    <div class="section-title honsha">📝 日報の記入</div>
+    <div class="cols">
+      <div class="card">
+        <h3>📋 記入項目（①〜⑦）</h3>
+        <ul>
+          <li><strong>① 日付</strong> — 対象日を選択</li>
+          <li><strong>② 出勤スタッフ</strong> — 当日出勤したスタッフを選択</li>
+          <li><strong>③ 客数</strong> — 当日の来客数を入力</li>
+          <li><strong>④ サブスク契約数</strong> — 件数を選択すると契約者の入力欄が展開</li>
+          <li><strong>⑤ サブスク解約件数</strong> — 件数を選択すると解約者の氏名入力欄が展開</li>
+          <li><strong>⑥ 実施業務</strong> — 当日のメモ・実施内容を自由記入</li>
+          <li><strong>⑦ 備考</strong> — その他連絡事項</li>
+        </ul>
+        <div class="note">「保存する」ボタンで送信。本社で一覧確認できます</div>
+      </div>
+      <div class="card">
+        <h3>④ サブスク契約詳細の入力</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">「サブスク契約数」のドロップダウンで件数を選択</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">件数分の入力欄が展開される</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">各行に <strong>氏名</strong> と <strong>契約プラン</strong> を入力</div></div>
+        <div class="note" style="margin-top:4px">
+          プラン種別：
+          <span class="badge badge-blue">ツキイチ</span>
+          <span class="badge badge-green">ライト</span>
+          <span class="badge badge-orange">スタンダード</span>
+          <span class="badge badge-purple">プレミアム</span>
+        </div>
+        <hr class="divider">
+        <h3>⑤ サブスク解約件数の入力</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">「サブスク解約件数」のドロップダウンで件数を選択</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">件数分の氏名入力欄が展開される</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">解約者の氏名を各行に入力</div></div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SC同期 -->
+  <div class="section">
+    <div class="section-title honsha">🔗 Salon Connect 自動シフト同期</div>
+    <div class="cols">
+      <div class="card">
+        <h3>🚀 SC全員同期の使い方</h3>
+        <div class="step"><div class="step-num purple">1</div><div class="step-text">Tampermonkey をChrome拡張に追加（初回のみ）</div></div>
+        <div class="step"><div class="step-num purple">2</div><div class="step-text">スクリプト「サムライ→SC自動同期」をインストール（初回のみ）</div></div>
+        <div class="step"><div class="step-num purple">3</div><div class="step-text">サムライシステム「シフト管理」→「🔗 SC全員同期」ボタンをクリック</div></div>
+        <div class="step"><div class="step-num purple">4</div><div class="step-text">Salon Connect のタブが自動で開く</div></div>
+        <div class="step"><div class="step-num purple">5</div><div class="step-text">スクリプトが全スタッフ分を順番に自動入力・保存する</div></div>
+        <div class="note warn">⚠️ 処理中はタブを閉じないこと。完了まで約1〜2分かかります</div>
+      </div>
+      <div class="card">
+        <h3>📌 SC同期の注意点</h3>
+        <ul>
+          <li>シフトを<strong>公開済み</strong>にしてから同期を実行してください</li>
+          <li>未公開シフトは「スキップ」扱いで入力されません</li>
+          <li>同期対象: 西新宿・三丁目の全スタッフ（7名）</li>
+          <li>同期後は Salon Connect 側で内容を必ず確認</li>
+        </ul>
+        <hr class="divider">
+        <h3>⏱️ シフトパターン対応表</h3>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div><span>早番 13:00-18:00</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2980b9"></div><span>遅番 16:00-22:00</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2c3e50"></div><span>フル 13:00-22:00</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div><span>土日 11:00-17:00</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2c3e50"></div><span>土日 11:00-22:00</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#7f8c8d"></div><span>おまかせ（全日）</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ページ更新履歴 -->
+  <div class="section">
+    <div class="section-title common">📋 更新履歴</div>
+    <div class="card">
+      <ul>
+        <li><span class="badge badge-green">2026.06</span> 日報④サブスク契約詳細（氏名・プラン）入力欄を追加</li>
+        <li><span class="badge badge-green">2026.06</span> 日報⑤サブスク解約件数・解約者氏名入力欄を追加</li>
+        <li><span class="badge badge-green">2026.06</span> Salon Connect 自動シフト同期（🔗 SC全員同期）機能を追加</li>
+        <li><span class="badge badge-blue">2026.05</span> 初版リリース（シフト管理・日報・お知らせ・ご意見箱）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Samurai System 操作マニュアル — 日報・SC同期</span>
+    <span>samurai-beauty.github.io/test &nbsp;|&nbsp; 3 / 3</span>
   </div>
 </div>
 
