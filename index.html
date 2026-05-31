@@ -1565,6 +1565,50 @@ async function removeStylist(name) {
 }
 
 // ========================================
+// 退職管理
+// ========================================
+let retiredMembers = []; // [{ name, store, retiredAt }]
+const RETIRED_LOCAL_KEY = '__retired_members_local';
+
+async function loadRetiredMembers() {
+  const cached = localStorage.getItem(RETIRED_LOCAL_KEY);
+  if (cached) retiredMembers = JSON.parse(cached);
+  const { data } = await sb.from('sales_data').select('data_json').eq('store_key', '__retired_members').maybeSingle();
+  if (data?.data_json && Array.isArray(data.data_json)) {
+    retiredMembers = data.data_json;
+    localStorage.setItem(RETIRED_LOCAL_KEY, JSON.stringify(retiredMembers));
+  }
+}
+
+async function saveRetiredMembers() {
+  localStorage.setItem(RETIRED_LOCAL_KEY, JSON.stringify(retiredMembers));
+  await sb.from('sales_data').upsert({
+    store_key: '__retired_members',
+    data_json: retiredMembers,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: currentUser || ''
+  }, { onConflict: 'store_key' });
+}
+
+async function retireMember(name, storeKey) {
+  if (!confirm(`「${name}」を退職済みにしますか？\n\nシフト・ログイン・全選択肢から除外されます。`)) return;
+  if (!retiredMembers.some(r => r.name === name)) {
+    retiredMembers.push({ name, store: storeKey, retiredAt: new Date().toISOString() });
+    await saveRetiredMembers();
+  }
+  renderStylistManage();
+  updateUnsubmittedBanner(shiftManageMonth.y, shiftManageMonth.m);
+  renderManageReqTable(shiftManageMonth.y, shiftManageMonth.m);
+}
+
+async function restoreMember(name) {
+  if (!confirm(`「${name}」を復職させますか？\nシフト・ログイン・選択肢に再表示されます。`)) return;
+  retiredMembers = retiredMembers.filter(r => r.name !== name);
+  await saveRetiredMembers();
+  renderStylistManage();
+}
+
+// ========================================
 // マニュアル資料
 // ========================================
 let docMeta = { categories: [], files: [] };
@@ -2150,13 +2194,14 @@ function renderStylistManage() {
     const storeCustom = customStylists.filter(s => s.store === storeKey);
     const allM = [...members, ...storeCustom.map(s => s.name).filter(n => !members.includes(n))];
     if (allM.length === 0) { html += '<div style="color:#aaa;font-size:13px">メンバーなし</div>'; }
-    allM.forEach(name => {
+    allM.filter(n => !retiredMembers.some(r => r.name === n)).forEach(name => {
       const isCustom = customStylists.some(s => s.name === name);
       html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px">
         <span style="font-size:14px">${name}</span>
         <div style="display:flex;align-items:center;gap:8px">
           ${isCustom ? stylistStoreSelect(name, storeKey) : ''}
-          ${isCustom ? `<button onclick="removeStylist('${name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : '<span style="font-size:11px;color:#aaa">固定</span>'}
+          ${isCustom ? `<button onclick="removeStylist('${name}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e74c3c;color:#e74c3c;background:white;cursor:pointer;font-size:12px">削除</button>` : ''}
+          <button onclick="retireMember('${name.replace(/'/g,"\\'")}','${storeKey}')" style="padding:3px 10px;border-radius:6px;border:1.5px solid #e67e22;color:#e67e22;background:white;cursor:pointer;font-size:12px">退職</button>
         </div>
       </div>`;
     });
@@ -2177,6 +2222,23 @@ function renderStylistManage() {
     });
     html += '</div>';
   }
+  // 退職済みスタッフ
+  if (retiredMembers.length > 0) {
+    html += `<div style="margin-top:16px;padding-top:12px;border-top:2px dashed #eee">
+      <div style="font-size:13px;font-weight:700;color:#aaa;margin-bottom:8px">🚪 退職済みスタッフ</div>`;
+    retiredMembers.forEach(r => {
+      const dateStr = r.retiredAt ? new Date(r.retiredAt).toLocaleDateString('ja-JP') : '';
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #e0e0e0;margin-bottom:5px;opacity:0.7">
+        <div>
+          <span style="font-size:14px;color:#888;text-decoration:line-through">${r.name}</span>
+          <span style="font-size:11px;color:#aaa;margin-left:8px">${STORE_LABELS[r.store]||r.store||''}${dateStr?' ・ 退職:'+dateStr:''}</span>
+        </div>
+        <button onclick="restoreMember('${r.name.replace(/'/g,"\\'")}') " style="padding:3px 10px;border-radius:6px;border:1.5px solid #27ae60;color:#27ae60;background:white;cursor:pointer;font-size:12px">復職</button>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
   list.innerHTML = html;
 }
 
@@ -2187,6 +2249,7 @@ function doLogin() {
   const err = document.getElementById('loginError');
   if (!store) { err.style.display = 'block'; err.textContent = '店舗を選択してください'; return; }
   if (!name) { err.style.display = 'block'; err.textContent = 'スタイリスト名を選択してください'; return; }
+  if (retiredMembers.some(r => r.name === name)) { err.style.display = 'block'; err.textContent = 'このアカウントは無効です。管理者にお問い合わせください。'; return; }
   const expected = getPassword(name);
   if (!expected || pass !== expected) { err.style.display = 'block'; err.textContent = 'パスワードが違います'; return; }
   err.style.display = 'none';
@@ -2246,8 +2309,9 @@ function doLogin() {
   }
   // 店舗タブの表示状態を更新
   updateManageStoreTabs();
-  // カスタムスタイリストをSupabaseから読込
+  // カスタムスタイリスト・退職者リストをSupabaseから読込
   loadCustomStylists();
+  loadRetiredMembers().then(() => { renderStylistManage(); updateUnsubmittedBanner(shiftManageMonth.y, shiftManageMonth.m); });
   // お知らせ読み込み・管理者は編集タブ表示
   loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); renderTodayStaff(); });
   document.getElementById('noticeTabBar').style.display = isMgr ? 'block' : 'none';
@@ -3846,7 +3910,8 @@ function updateManageStoreTabs() {
 function getMembersOfStore(store) {
   const base = STORE_MEMBERS[store] || [];
   const custom = customStylists.filter(s => s.store === store).map(s => s.name);
-  return [...base, ...custom];
+  const retiredNames = new Set(retiredMembers.map(r => r.name));
+  return [...base, ...custom].filter(n => !retiredNames.has(n));
 }
 function getMembersForManage() {
   const result = [];
