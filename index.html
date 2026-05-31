@@ -5416,8 +5416,9 @@ async function renderDaily() {
       ${(existing.contract_details?.length ? `
         <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
           ${existing.contract_details.map((d,i) => `
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#555">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555">
               <span style="color:#8e44ad;font-weight:700">${i+1}</span>
+              ${d.stylist ? `<span style="background:#d8bfff;color:#5b2c9e;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700">✂️ ${d.stylist}</span>` : ''}
               <span style="font-weight:600">${d.name||'—'}</span>
               ${d.plan ? `<span style="background:#e0c8f8;color:#6c3483;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700">${d.plan}</span>` : ''}
             </div>`).join('')}
@@ -5640,34 +5641,50 @@ function updateContractRows(count, existingData) {
   const current = [];
   container.querySelectorAll('.contract-row').forEach(row => {
     current.push({
+      stylist: row.querySelector('.cr-stylist')?.value || '',
       name: row.querySelector('.cr-name')?.value || '',
       plan: row.querySelector('.cr-plan')?.value || '',
     });
   });
 
   container.innerHTML = '';
-  const planOpts = SUBSCRIBE_PLANS.map(p => `<option value="${p}">${p}</option>`).join('');
+
+  // 契約者（スタイリスト）の選択肢：当該店舗メンバー
+  const storeForMembers = dailyStore || currentStore || 'nishishinjuku';
+  const stylistList = getMembersOfStore(storeForMembers);
+  const stylistOpts = stylistList.map(s => `<option value="${s}">${s}</option>`).join('');
 
   for (let i = 0; i < count; i++) {
     const saved = (existingData && existingData[i]) || current[i] || {};
+    const stylistVal = saved.stylist || '';
     const nameVal = saved.name || '';
     const planVal = saved.plan || '';
     const row = document.createElement('div');
     row.className = 'contract-row';
-    row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;background:#f8f0ff;border-radius:8px;padding:8px 10px;border:1px solid #e0c8f8';
+    row.style.cssText = 'background:#f8f0ff;border-radius:8px;padding:8px 10px;border:1px solid #e0c8f8;display:flex;flex-direction:column;gap:5px';
     row.innerHTML = `
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:11px;font-weight:700;color:#8e44ad;min-width:18px">${i+1}</span>
-        <input class="cr-name" type="text" placeholder="氏名" value="${nameVal.replace(/"/g,'&quot;')}"
-          style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <label style="font-size:11px;color:#888;white-space:nowrap">契約者</label>
+        <select class="cr-stylist"
+          style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#333;background:white">
+          <option value="">スタイリスト選択</option>
+          ${stylistList.map(s => `<option value="${s}"${s===stylistVal?' selected':''}>${s}</option>`).join('')}
+        </select>
+        <button type="button" onclick="removeContractRow(this)"
+          style="padding:3px 8px;background:none;border:1px solid #e0c8f8;border-radius:6px;color:#aaa;font-size:12px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding-left:24px">
+        <label style="font-size:11px;color:#888;white-space:nowrap">氏名</label>
+        <input class="cr-name" type="text" placeholder="お客様氏名" value="${nameVal.replace(/"/g,'&quot;')}"
+          style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <label style="font-size:11px;color:#888;white-space:nowrap">プラン</label>
         <select class="cr-plan"
-          style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#333">
-          <option value="">プラン選択</option>
+          style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#333;background:white">
+          <option value="">選択</option>
           ${SUBSCRIBE_PLANS.map(p => `<option value="${p}"${p===planVal?' selected':''}>${p}</option>`).join('')}
         </select>
       </div>
-      <button type="button" onclick="removeContractRow(this)"
-        style="padding:4px 8px;background:none;border:1px solid #e0c8f8;border-radius:6px;color:#aaa;font-size:12px;cursor:pointer">✕</button>
     `;
     container.appendChild(row);
   }
@@ -5905,9 +5922,10 @@ async function submitDailyReport(status = 'submitted') {
       contract_details: (() => {
         const rows = document.querySelectorAll('#daily_contract_rows .contract-row');
         return Array.from(rows).map(r => ({
+          stylist: r.querySelector('.cr-stylist')?.value || '',
           name: r.querySelector('.cr-name')?.value.trim() || '',
           plan: r.querySelector('.cr-plan')?.value || '',
-        })).filter(d => d.name || d.plan);
+        })).filter(d => d.stylist || d.name || d.plan);
       })(),
       cancel_count: parseInt(document.getElementById('daily_cancel_count')?.value) || 0,
       cancel_details: (() => {
