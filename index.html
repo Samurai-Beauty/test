@@ -5363,6 +5363,7 @@ const DAILY_STORES = [
 
 let dailyDate  = new Date();
 let dailyStore = null; // 本社用選択中店舗
+let dailyEditMode = false; // 下書き編集モードフラグ
 
 function dailyKey(storeKey, dateStr) {
   return `daily_report_${storeKey}_${dateStr}`;
@@ -5427,7 +5428,9 @@ async function renderDaily() {
   let html = '';
 
   // ── 閲覧モード（提出済み or 下書き） ────────────────────────
-  if (existing && (existing.status === 'submitted' || existing.status === 'draft')) {
+  const _editMode = dailyEditMode;
+  dailyEditMode = false; // フラグをリセット
+  if (!_editMode && existing && (existing.status === 'submitted' || existing.status === 'draft')) {
     const isDraft = existing.status === 'draft';
     const badgeHtml = isDraft
       ? `<span style="padding:3px 10px;background:#fff3cd;color:#856404;border-radius:20px;font-size:12px;font-weight:700">✏️ 下書き</span>`
@@ -5669,7 +5672,7 @@ function renderDailyFormHtml(existing, storeMembers, canSubmit) {
   return html;
 }
 
-function renderDailyForm() { renderDaily(); }
+function renderDailyForm() { dailyEditMode = true; renderDaily(); }
 
 function dailyShiftRow(i, name, start, end, members) {
   const opts = members.map(m => `<option value="${m}" ${m===name?'selected':''}>${m}</option>`).join('');
@@ -5816,12 +5819,6 @@ function dailyAddTask() {
   lbl.innerHTML = `<input type="checkbox" value="${val}" checked style="width:18px;height:18px;accent-color:#27ae60;cursor:pointer"><span style="font-size:14px">${val}</span>`;
   list.appendChild(lbl);
   inp.value = '';
-}
-
-function dailyEditMode() {
-  // 編集モードは再レンダリングで入力フォームを出す
-  // 既存データを一時消去してフォームへ
-  renderDailyFormOnly();
 }
 
 function dailySelectStore(storeKey) {
