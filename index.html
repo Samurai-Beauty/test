@@ -5821,12 +5821,6 @@ function dailyAddTask() {
   inp.value = '';
 }
 
-function dailyEditMode() {
-  // 編集モードは再レンダリングで入力フォームを出す
-  // 既存データを一時消去してフォームへ
-  renderDailyFormOnly();
-}
-
 function dailySelectStore(storeKey) {
   dailyStore = storeKey;
   renderDaily();
