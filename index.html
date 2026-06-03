@@ -2501,11 +2501,11 @@ function showSection(name) {
     }
     renderStylistManage();
   }
-  else if (name === 'notice') { renderNoticeList(); _badgeMarkSeen('notice'); setNavBadge('nav-notice', 0); }
+  else if (name === 'notice') { renderNoticeList(); _badgeMarkSeen('notice'); setNavBadge('nav-notice', 0); _updateAppIconBadge(); }
   else if (name === 'documents') { loadDocuments().then(() => renderDocuments()); }
-  else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); _badgeMarkSeen('suggest'); setNavBadge('nav-suggestions', 0); }
+  else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); _badgeMarkSeen('suggest'); setNavBadge('nav-suggestions', 0); _updateAppIconBadge(); }
   else if (name === 'reservations') { loadTodayReservations(); }
-  else if (name === 'shift-swap') { renderShiftSwap(); _badgeMarkSeen('swap'); setNavBadge('nav-shift-swap', 0); }
+  else if (name === 'shift-swap') { renderShiftSwap(); _badgeMarkSeen('swap'); setNavBadge('nav-shift-swap', 0); _updateAppIconBadge(); }
   else if (name === 'daily')  { renderDaily(); }
   else if (name === 'inflow') { renderInflow(); }
   else if (name === 'photo') { renderPhotoGallery(); }
@@ -2856,6 +2856,14 @@ function _badgeLastSeen(section) {
 function _badgeMarkSeen(section) {
   localStorage.setItem(_badgeKey(section), new Date().toISOString());
 }
+function _updateAppIconBadge() {
+  if (!('setAppBadge' in navigator)) return;
+  const total = [...document.querySelectorAll('.nav-badge')]
+    .reduce((s, el) => s + (el.style.display !== 'none' ? (parseInt(el.textContent) || 0) : 0), 0);
+  if (total > 0) navigator.setAppBadge(total).catch(() => {});
+  else navigator.clearAppBadge().catch(() => {});
+}
+
 function setNavBadge(navId, count) {
   const navEl = document.getElementById(navId);
   if (!navEl) return;
@@ -2935,6 +2943,15 @@ async function updateNavBadges() {
       setNavBadge('nav-shift-swap', swapCount);
     }
   } catch(e) { /* ignore */ }
+
+  // ── ホーム画面アイコンバッジ（Badging API）────────────
+  const totalCount = [
+    ...document.querySelectorAll('.nav-badge')
+  ].reduce((sum, el) => sum + (el.style.display !== 'none' ? (parseInt(el.textContent) || 0) : 0), 0);
+  if ('setAppBadge' in navigator) {
+    if (totalCount > 0) navigator.setAppBadge(totalCount).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
+  }
 }
 
 function scheduleDashboardUpdates() {
