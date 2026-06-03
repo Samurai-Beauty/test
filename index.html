@@ -70,10 +70,19 @@
     nav.sidebar .nav-item {
       display: flex; align-items: center; gap: 10px; padding: 12px 20px; color: #444;
       cursor: pointer; font-size: 14px; transition: background .2s; border-left: 3px solid transparent;
+      position: relative;
     }
     nav.sidebar .nav-item:hover { background: rgba(0,0,0,0.06); }
     nav.sidebar .nav-item.active { background: rgba(0,0,0,0.1); border-left-color: #555; font-weight: 700; color: #1a1a1a; }
     nav.sidebar .nav-item .icon { font-size: 18px; }
+    .nav-badge {
+      position: absolute; top: 6px; right: 6px;
+      background: #e74c3c; color: #fff;
+      font-size: 10px; font-weight: 700;
+      min-width: 17px; height: 17px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px; box-sizing: border-box; pointer-events: none;
+    }
 
     main.content { flex: 1; padding: 28px; overflow-y: auto; }
 
@@ -2313,7 +2322,10 @@ function doLogin() {
   loadCustomStylists();
   loadRetiredMembers().then(() => { renderStylistManage(); updateUnsubmittedBanner(shiftManageMonth.y, shiftManageMonth.m); });
   // お知らせ読み込み・管理者は編集タブ表示
-  loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); renderTodayStaff(); });
+  loadNotices().then(() => { renderNoticeList(); renderHomeNotice(); renderTodayStaff(); updateNavBadges(); });
+  // バッジ定期更新（3分ごと）
+  if (window._badgeTimer) clearInterval(window._badgeTimer);
+  window._badgeTimer = setInterval(updateNavBadges, 3 * 60 * 1000);
   document.getElementById('noticeTabBar').style.display = isMgr ? 'block' : 'none';
   // ダッシュボード自動更新スケジュール
   scheduleDashboardUpdates();
@@ -2483,18 +2495,17 @@ function showSection(name) {
   else if (name === 'shift-manage') { updateManageStoreTabs(); renderShiftManage(); }
   else if (name === 'shift-view') { renderShiftView(); loadShiftsFromSupabase(); }
   else if (name === 'stylist-manage') {
-    // FCオーナーは追加フォームの配属店舗を自店舗に固定
     if (isFCOwner()) {
       const sel = document.getElementById('newStylistStore');
       if (sel) { sel.value = currentStore; sel.disabled = true; }
     }
     renderStylistManage();
   }
-  else if (name === 'notice') { renderNoticeList(); }
+  else if (name === 'notice') { renderNoticeList(); _badgeMarkSeen('notice'); setNavBadge('nav-notice', 0); }
   else if (name === 'documents') { loadDocuments().then(() => renderDocuments()); }
-  else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); }
+  else if (name === 'suggestions') { loadSuggestions().then(() => renderSuggestions()); _badgeMarkSeen('suggest'); setNavBadge('nav-suggestions', 0); }
   else if (name === 'reservations') { loadTodayReservations(); }
-  else if (name === 'shift-swap') { renderShiftSwap(); }
+  else if (name === 'shift-swap') { renderShiftSwap(); _badgeMarkSeen('swap'); setNavBadge('nav-shift-swap', 0); }
   else if (name === 'daily')  { renderDaily(); }
   else if (name === 'inflow') { renderInflow(); }
   else if (name === 'photo') { renderPhotoGallery(); }
@@ -2832,6 +2843,98 @@ function updateNextUpdateTime() {
   }
   document.getElementById('dashNextUpdate').textContent =
     next.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ========================================
+// ナビバッジ通知
+// ========================================
+function _badgeKey(section) { return `__badge_seen_${section}_${currentUser || ''}`; }
+function _badgeLastSeen(section) {
+  const v = localStorage.getItem(_badgeKey(section));
+  return v ? new Date(v) : new Date(0);
+}
+function _badgeMarkSeen(section) {
+  localStorage.setItem(_badgeKey(section), new Date().toISOString());
+}
+function setNavBadge(navId, count) {
+  const navEl = document.getElementById(navId);
+  if (!navEl) return;
+  let badge = navEl.querySelector('.nav-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'nav-badge';
+    navEl.appendChild(badge);
+  }
+  if (count > 0) {
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+async function updateNavBadges() {
+  if (!currentUser) return;
+  const isAdmin = currentStore === 'honsha' || isFCOwner();
+
+  // ── お知らせ ──────────────────────────────────────
+  const noticeSeen = _badgeLastSeen('notice');
+  const noticeCount = notices.filter(n => n.date && new Date(n.date) > noticeSeen).length;
+  setNavBadge('nav-notice', noticeCount);
+
+  // ── ご意見箱 ──────────────────────────────────────
+  const suggestSeen = _badgeLastSeen('suggest');
+  try {
+    const { data: suggRows } = await sb.from('sales_data').select('data_json')
+      .like('store_key', 'sugg_%');
+    if (suggRows) {
+      const allSugg = suggRows.map(r => {
+        let o = r.data_json;
+        if (typeof o === 'string') { try { o = JSON.parse(o); } catch(e) { return null; } }
+        return o;
+      }).filter(Boolean);
+      let suggestCount = 0;
+      if (isAdmin) {
+        // 管理者: 未返信の新規ご意見 or lastSeen以降に届いたもの
+        suggestCount = allSugg.filter(s => new Date(s.createdAt) > suggestSeen).length;
+      } else {
+        // スタイリスト: 自分のご意見に新しい返信が来たもの
+        suggestCount = allSugg.filter(s =>
+          s.author === currentUser &&
+          (s.replies || []).some(r => new Date(r.createdAt) > suggestSeen)
+        ).length;
+      }
+      setNavBadge('nav-suggestions', suggestCount);
+    }
+  } catch(e) { /* ignore */ }
+
+  // ── シフト変更 ────────────────────────────────────
+  const swapSeen = _badgeLastSeen('swap');
+  try {
+    const { data: swapRows } = await sb.from('shift_swaps').select('*')
+      .order('requested_at', { ascending: false }).limit(100);
+    if (swapRows) {
+      let swapCount = 0;
+      if (isAdmin) {
+        // 管理者: 承認待ち件数
+        swapCount = swapRows.filter(s => s.status === 'pending').length;
+      } else {
+        // スタイリスト: 自分の申請が承認/却下されたもの（lastSeen以降）
+        swapCount = swapRows.filter(s =>
+          s.from_user === currentUser &&
+          (s.status === 'approved' || s.status === 'rejected') &&
+          s.responded_at && new Date(s.responded_at) > swapSeen
+        ).length;
+        // 自分宛ての新しいリクエスト（旧swap形式）
+        swapCount += swapRows.filter(s =>
+          s.to_user === currentUser &&
+          s.status === 'pending' &&
+          new Date(s.requested_at) > swapSeen
+        ).length;
+      }
+      setNavBadge('nav-shift-swap', swapCount);
+    }
+  } catch(e) { /* ignore */ }
 }
 
 function scheduleDashboardUpdates() {
