@@ -5417,9 +5417,11 @@ async function renderDaily() {
   const storeLabel = DAILY_STORES.find(s => s.key === dailyStore)?.label || dailyStore;
   const storeMembers = STORE_MEMBERS[dailyStore] || [];
 
-  // 今日以前かつ自店舗のみ提出・編集可（他店舗は閲覧のみ）
+  // 今日以前かつ自店舗のみ提出・編集可（西新宿↔三丁目は相互編集可、他店舗は閲覧のみ）
   const today = dailyDateStr(new Date());
-  const isOwnStore = currentStore === 'honsha' || dailyStore === currentStore;
+  const _sisterStores = new Set(['nishishinjuku', 'sanchome']);
+  const isOwnStore = currentStore === 'honsha' || dailyStore === currentStore ||
+    (_sisterStores.has(currentStore) && _sisterStores.has(dailyStore));
   const canSubmit = dateStr <= today && isOwnStore;
 
   let html = '';
