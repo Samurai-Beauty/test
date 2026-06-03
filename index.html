@@ -491,6 +491,9 @@
       <div class="nav-item" onclick="showSection('inflow')" id="nav-inflow" style="display:none">
         <span class="icon">📊</span><span>流入分析</span>
       </div>
+      <div class="nav-item" onclick="showSection('karte')" id="nav-karte" style="display:none">
+        <span class="icon">📋</span><span>カルテ閲覧</span>
+      </div>
       <div class="nav-item" onclick="showSection('photo')" id="nav-photo">
         <span class="icon">📸</span><span>フォト</span>
       </div>
@@ -1104,6 +1107,18 @@
         <!-- 本社用店舗タブ -->
         <div id="dailyStoreTabs" style="display:none;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px"></div>
         <div id="dailyContent" style="padding-bottom:24px">
+          <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
+        </div>
+      </div>
+
+      <!-- ====== カルテ閲覧 ====== -->
+      <div class="section" id="section-karte">
+        <div class="section-title">📋 カルテ閲覧（エルメ連携）</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span id="karteSyncLabel" style="font-size:12px;color:#aaa">読み込み中...</span>
+          <button onclick="loadKarte()" style="padding:5px 14px;border:1.5px solid #0f3460;color:#0f3460;background:#fff;border-radius:8px;cursor:pointer;font-size:12px">🔄 今すぐ更新</button>
+        </div>
+        <div id="karteContent" style="padding-bottom:24px">
           <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
         </div>
       </div>
@@ -2310,6 +2325,8 @@ function doLogin() {
   document.getElementById('nav-shift-swap').style.display = 'flex';
   // 流入分析は本社・FCオーナーのみ
   document.getElementById('nav-inflow').style.display = isMgr ? 'flex' : 'none';
+  document.getElementById('nav-karte').style.display  = currentStore === 'honsha' ? 'flex' : 'none';
+  if (currentStore === 'honsha') startKarteAutoRefresh();
   // 店舗管理者はデフォルトで自店舗のみ表示
   if (isMgr && !isHonsha) {
     shiftManageStore = [store];
@@ -2508,6 +2525,7 @@ function showSection(name) {
   else if (name === 'shift-swap') { renderShiftSwap(); _badgeMarkSeen('swap'); setNavBadge('nav-shift-swap', 0); _updateAppIconBadge(); }
   else if (name === 'daily')  { renderDaily(); }
   else if (name === 'inflow') { renderInflow(); }
+  else if (name === 'karte') { loadKarte(); }
   else if (name === 'photo') { renderPhotoGallery(); }
 }
 
@@ -4994,6 +5012,70 @@ function _renderSwapHistory(container, swaps) {
 // ========================================
 const PHOTO_FOLDER_LABELS = { eyebrow: '眉毛', nail: 'メンズネイル', other: 'その他' };
 let currentPhotoFolder = 'eyebrow';
+
+// ========================================
+// カルテ閲覧（エルメ連携 リアルタイム）
+// ========================================
+let _karteTimer = null;
+
+async function loadKarte() {
+  const el      = document.getElementById('karteContent');
+  const labelEl = document.getElementById('karteSyncLabel');
+  if (!el) return;
+
+  const { data, error } = await sb.from('sales_data')
+    .select('data_json, uploaded_at')
+    .eq('store_key', 'karte_live')
+    .maybeSingle();
+
+  if (error || !data) {
+    el.innerHTML = '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">データがありません。GASのrealtimeSyncが実行されると表示されます。</p></div>';
+    if (labelEl) labelEl.textContent = 'データなし';
+    return;
+  }
+
+  const responses = Array.isArray(data.data_json) ? data.data_json : [];
+  const updatedAt = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  if (labelEl) labelEl.textContent = '最終更新: ' + updatedAt + '（60秒ごと自動更新）';
+
+  if (responses.length === 0) {
+    el.innerHTML = '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">回答はまだありません</p></div>';
+    return;
+  }
+
+  const STORE_NAME = { nishishinjuku: '西新宿', sanchome: '三丁目', shibuya: '渋谷東' };
+  const storeMap   = { '西新宿小滝橋通り 店': '西新宿', '新宿三丁目 店': '三丁目', '渋谷東 店': '渋谷東' };
+
+  let html = `<div class="card">
+    <div class="card-title">📋 カルテ回答一覧（直近200件）</div>
+    <div class="req-table-wrap"><table class="req-table" style="font-size:12px"><thead><tr>
+      <th>日時</th><th>店舗</th><th>氏名</th><th>電話</th><th>流入</th><th>メニュー</th>
+    </tr></thead><tbody>`;
+
+  responses.forEach(function(r) {
+    const dt    = r.answered_at ? new Date(r.answered_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    const store = storeMap[r.store] || STORE_NAME[r.store] || r.store || '—';
+    html += `<tr>
+      <td style="white-space:nowrap">${dt}</td>
+      <td>${store}</td>
+      <td>${r.name || '—'}</td>
+      <td>${r.phone || '—'}</td>
+      <td style="font-size:11px">${r.inflow || '—'}</td>
+      <td style="font-size:11px">${r.menu || '—'}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+}
+
+function startKarteAutoRefresh() {
+  if (_karteTimer) clearInterval(_karteTimer);
+  _karteTimer = setInterval(function() {
+    const section = document.getElementById('section-karte');
+    if (section && section.classList.contains('active')) loadKarte();
+  }, 60 * 1000);
+}
 
 function renderPhotoGallery() {
   ['eyebrow', 'nail', 'other'].forEach(f => {
