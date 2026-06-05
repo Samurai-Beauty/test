@@ -1104,6 +1104,15 @@
             <button onclick="dailyNext()">&#8250;</button>
           </div>
         </div>
+        <!-- ワード検索バー -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+          <input id="dailySearchInput" type="text" placeholder="🔍 日報を検索（特記事項・スタッフ名など）"
+            oninput="onDailySearchInput()"
+            style="flex:1;padding:9px 14px;border:1.5px solid #ddd;border-radius:20px;font-size:14px;outline:none">
+          <button onclick="clearDailySearch()" id="dailySearchClearBtn" style="display:none;padding:7px 14px;border:1.5px solid #aaa;background:#fff;color:#555;border-radius:20px;font-size:13px;cursor:pointer">✕ クリア</button>
+        </div>
+        <!-- 検索結果（通常は非表示） -->
+        <div id="dailySearchResults" style="display:none;margin-bottom:16px"></div>
         <!-- 本社用店舗タブ -->
         <div id="dailyStoreTabs" style="display:none;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px"></div>
         <div id="dailyContent" style="padding-bottom:24px">
@@ -6214,6 +6223,94 @@ async function saveDailyToSupabase(key, data) {
     uploaded_by: 'daily_report',
   }, { onConflict: 'store_key' });
   if (error) throw new Error(error.message);
+}
+
+// ---- 日報ワード検索 ----
+let _dailySearchTimer = null;
+
+function onDailySearchInput() {
+  const q = (document.getElementById('dailySearchInput')?.value || '').trim();
+  const clearBtn = document.getElementById('dailySearchClearBtn');
+  if (clearBtn) clearBtn.style.display = q ? 'inline-block' : 'none';
+  clearTimeout(_dailySearchTimer);
+  if (!q) { clearDailySearch(true); return; }
+  _dailySearchTimer = setTimeout(() => _runDailySearch(q), 400);
+}
+
+function clearDailySearch(keepInput) {
+  if (!keepInput) {
+    const inp = document.getElementById('dailySearchInput');
+    if (inp) inp.value = '';
+  }
+  const clearBtn = document.getElementById('dailySearchClearBtn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const res = document.getElementById('dailySearchResults');
+  if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+}
+
+async function _runDailySearch(q) {
+  const resEl = document.getElementById('dailySearchResults');
+  if (!resEl) return;
+  resEl.style.display = 'block';
+  resEl.innerHTML = '<div style="color:#888;padding:12px 4px;font-size:13px">🔍 検索中...</div>';
+
+  try {
+    const { data, error } = await sb.from('sales_data')
+      .select('store_key, data_json, uploaded_at')
+      .like('store_key', 'daily_report_%')
+      .order('store_key', { ascending: false })
+      .limit(500);
+    if (error) throw new Error(error.message);
+
+    const kw = q.toLowerCase();
+    const hits = [];
+    (data || []).forEach(row => {
+      const d = row.data_json;
+      if (!d) return;
+      const haystack = [
+        d.memo || '',
+        d.submitted_by || '',
+        ...(d.staff_shifts || []).map(s => s.name || ''),
+        ...(d.contract_details || []).map(c => [c.stylist, c.name, c.plan].join(' ')),
+        ...(d.cancel_details || []).map(c => c.name || ''),
+      ].join(' ').toLowerCase();
+      if (haystack.includes(kw)) {
+        const storeLabel = (DAILY_STORES.find(s => s.key === d.store) || {}).label || d.store || '';
+        hits.push({ store_key: row.store_key, date: d.date, store: d.store, storeLabel, memo: d.memo || '', submitted_by: d.submitted_by || '', staff: (d.staff_shifts || []).map(s => s.name).filter(Boolean) });
+      }
+    });
+
+    if (!hits.length) {
+      resEl.innerHTML = '<div style="color:#888;padding:12px 4px;font-size:13px">「' + _esc(q) + '」に一致する日報はありません。</div>';
+      return;
+    }
+
+    const html = hits.map(h => {
+      const snippet = h.memo ? (h.memo.length > 60 ? h.memo.slice(0, 60) + '…' : h.memo) : '';
+      return `<div onclick="_dailySearchJump('${h.store}','${h.date}')" style="padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff;transition:background .15s" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='#fff'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-weight:600;font-size:14px">${_esc(h.storeLabel)}</span>
+          <span style="font-size:13px;color:#666">${_esc(h.date)}</span>
+        </div>
+        <div style="font-size:12px;color:#888">${h.staff.length ? _esc(h.staff.join('・')) : ''}</div>
+        ${snippet ? `<div style="font-size:12px;color:#555;margin-top:3px">${_esc(snippet)}</div>` : ''}
+      </div>`;
+    }).join('');
+    resEl.innerHTML = `<div style="font-size:12px;color:#888;margin-bottom:8px">${hits.length}件ヒット</div>` + html;
+  } catch (e) {
+    resEl.innerHTML = '<div style="color:#c00;padding:12px 4px;font-size:13px">エラー: ' + _esc(e.message) + '</div>';
+  }
+}
+
+function _dailySearchJump(storeKey, dateStr) {
+  clearDailySearch();
+  dailyStore = storeKey;
+  dailyDate = new Date(dateStr + 'T00:00:00');
+  renderDaily();
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 async function submitDailyReport(status = 'submitted') {
