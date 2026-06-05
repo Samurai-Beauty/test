@@ -491,6 +491,9 @@
       <div class="nav-item" onclick="showSection('inflow')" id="nav-inflow" style="display:none">
         <span class="icon">📊</span><span>流入分析</span>
       </div>
+      <div class="nav-item" onclick="showSection('karte')" id="nav-karte" style="display:none">
+        <span class="icon">📋</span><span>カルテ閲覧</span>
+      </div>
       <div class="nav-item" onclick="showSection('photo')" id="nav-photo">
         <span class="icon">📸</span><span>フォト</span>
       </div>
@@ -1101,9 +1104,30 @@
             <button onclick="dailyNext()">&#8250;</button>
           </div>
         </div>
+        <!-- ワード検索バー -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+          <input id="dailySearchInput" type="text" placeholder="🔍 日報を検索（特記事項・スタッフ名など）"
+            oninput="onDailySearchInput()"
+            style="flex:1;padding:9px 14px;border:1.5px solid #ddd;border-radius:20px;font-size:14px;outline:none">
+          <button onclick="clearDailySearch()" id="dailySearchClearBtn" style="display:none;padding:7px 14px;border:1.5px solid #aaa;background:#fff;color:#555;border-radius:20px;font-size:13px;cursor:pointer">✕ クリア</button>
+        </div>
+        <!-- 検索結果（通常は非表示） -->
+        <div id="dailySearchResults" style="display:none;margin-bottom:16px"></div>
         <!-- 本社用店舗タブ -->
         <div id="dailyStoreTabs" style="display:none;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px"></div>
         <div id="dailyContent" style="padding-bottom:24px">
+          <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
+        </div>
+      </div>
+
+      <!-- ====== カルテ閲覧 ====== -->
+      <div class="section" id="section-karte">
+        <div class="section-title">📋 カルテ閲覧（エルメ連携）</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span id="karteSyncLabel" style="font-size:12px;color:#aaa">読み込み中...</span>
+          <button onclick="loadKarte()" style="padding:5px 14px;border:1.5px solid #0f3460;color:#0f3460;background:#fff;border-radius:8px;cursor:pointer;font-size:12px">🔄 今すぐ更新</button>
+        </div>
+        <div id="karteContent" style="padding-bottom:24px">
           <div style="text-align:center;padding:30px;color:#aaa">読み込み中...</div>
         </div>
       </div>
@@ -1366,7 +1390,7 @@ const SHIFT_OPTIONS = [
   { key: 'h11-22',  label: '11:00-22:00', sub: '土日祝のみ' },
   { key: 'h11-17',  label: '11:00-17:00', sub: '土日祝のみ' },
   { key: 'early',   label: '13:00-18:00', sub: '早番' },
-  { key: 'late',    label: '16:00-22:00', sub: '遅番' },
+  { key: 'late',    label: '17:00-22:00', sub: '遅番' },
   { key: 'full',    label: '13:00-22:00', sub: '平日フル' },
   { key: 'omakase', label: 'お任せシフト', sub: '' },
   { key: 'off',     label: '休日希望',     sub: '' },
@@ -1375,12 +1399,12 @@ const SHIFT_OPTIONS = [
 // シフト閲覧用の短縮時間ラベル
 const SHIFT_SHORT = {
   'h11-22': '11-22', 'h11-17': '11-17',
-  'early': '13-18',  'late':   '16-22',
+  'early': '13-18',  'late':   '17-22',
   'full':  '13-22',  'off':    '休',    'omakase': '任'
 };
 const SHIFT_LONG = {
   'h11-22': '11:00-22:00', 'h11-17': '11:00-17:00',
-  'early': '13:00-18:00',  'late':   '16:00-22:00',
+  'early': '13:00-18:00',  'late':   '17:00-22:00',
   'full':  '13:00-22:00',  'off':    '休み',         'omakase': 'お任せ'
 };
 function shiftShort(key) {
@@ -2310,6 +2334,8 @@ function doLogin() {
   document.getElementById('nav-shift-swap').style.display = 'flex';
   // 流入分析は本社・FCオーナーのみ
   document.getElementById('nav-inflow').style.display = isMgr ? 'flex' : 'none';
+  document.getElementById('nav-karte').style.display  = currentStore === 'honsha' ? 'flex' : 'none';
+  if (currentStore === 'honsha') startKarteAutoRefresh();
   // 店舗管理者はデフォルトで自店舗のみ表示
   if (isMgr && !isHonsha) {
     shiftManageStore = [store];
@@ -2508,6 +2534,7 @@ function showSection(name) {
   else if (name === 'shift-swap') { renderShiftSwap(); _badgeMarkSeen('swap'); setNavBadge('nav-shift-swap', 0); _updateAppIconBadge(); }
   else if (name === 'daily')  { renderDaily(); }
   else if (name === 'inflow') { renderInflow(); }
+  else if (name === 'karte') { loadKarte(); }
   else if (name === 'photo') { renderPhotoGallery(); }
 }
 
@@ -4995,6 +5022,70 @@ function _renderSwapHistory(container, swaps) {
 const PHOTO_FOLDER_LABELS = { eyebrow: '眉毛', nail: 'メンズネイル', other: 'その他' };
 let currentPhotoFolder = 'eyebrow';
 
+// ========================================
+// カルテ閲覧（エルメ連携 リアルタイム）
+// ========================================
+let _karteTimer = null;
+
+async function loadKarte() {
+  const el      = document.getElementById('karteContent');
+  const labelEl = document.getElementById('karteSyncLabel');
+  if (!el) return;
+
+  const { data, error } = await sb.from('sales_data')
+    .select('data_json, uploaded_at')
+    .eq('store_key', 'karte_live')
+    .maybeSingle();
+
+  if (error || !data) {
+    el.innerHTML = '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">データがありません。GASのrealtimeSyncが実行されると表示されます。</p></div>';
+    if (labelEl) labelEl.textContent = 'データなし';
+    return;
+  }
+
+  const responses = Array.isArray(data.data_json) ? data.data_json : [];
+  const updatedAt = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  if (labelEl) labelEl.textContent = '最終更新: ' + updatedAt + '（60秒ごと自動更新）';
+
+  if (responses.length === 0) {
+    el.innerHTML = '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">回答はまだありません</p></div>';
+    return;
+  }
+
+  const STORE_NAME = { nishishinjuku: '西新宿', sanchome: '三丁目', shibuya: '渋谷東' };
+  const storeMap   = { '西新宿小滝橋通り 店': '西新宿', '新宿三丁目 店': '三丁目', '渋谷東 店': '渋谷東' };
+
+  let html = `<div class="card">
+    <div class="card-title">📋 カルテ回答一覧（直近200件）</div>
+    <div class="req-table-wrap"><table class="req-table" style="font-size:12px"><thead><tr>
+      <th>日時</th><th>店舗</th><th>氏名</th><th>電話</th><th>流入</th><th>メニュー</th>
+    </tr></thead><tbody>`;
+
+  responses.forEach(function(r) {
+    const dt    = r.answered_at ? new Date(r.answered_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    const store = storeMap[r.store] || STORE_NAME[r.store] || r.store || '—';
+    html += `<tr>
+      <td style="white-space:nowrap">${dt}</td>
+      <td>${store}</td>
+      <td>${r.name || '—'}</td>
+      <td>${r.phone || '—'}</td>
+      <td style="font-size:11px">${r.inflow || '—'}</td>
+      <td style="font-size:11px">${r.menu || '—'}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+}
+
+function startKarteAutoRefresh() {
+  if (_karteTimer) clearInterval(_karteTimer);
+  _karteTimer = setInterval(function() {
+    const section = document.getElementById('section-karte');
+    if (section && section.classList.contains('active')) loadKarte();
+  }, 60 * 1000);
+}
+
 function renderPhotoGallery() {
   ['eyebrow', 'nail', 'other'].forEach(f => {
     const tab = document.getElementById('photoTab-' + f);
@@ -6132,6 +6223,94 @@ async function saveDailyToSupabase(key, data) {
     uploaded_by: 'daily_report',
   }, { onConflict: 'store_key' });
   if (error) throw new Error(error.message);
+}
+
+// ---- 日報ワード検索 ----
+let _dailySearchTimer = null;
+
+function onDailySearchInput() {
+  const q = (document.getElementById('dailySearchInput')?.value || '').trim();
+  const clearBtn = document.getElementById('dailySearchClearBtn');
+  if (clearBtn) clearBtn.style.display = q ? 'inline-block' : 'none';
+  clearTimeout(_dailySearchTimer);
+  if (!q) { clearDailySearch(true); return; }
+  _dailySearchTimer = setTimeout(() => _runDailySearch(q), 400);
+}
+
+function clearDailySearch(keepInput) {
+  if (!keepInput) {
+    const inp = document.getElementById('dailySearchInput');
+    if (inp) inp.value = '';
+  }
+  const clearBtn = document.getElementById('dailySearchClearBtn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const res = document.getElementById('dailySearchResults');
+  if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+}
+
+async function _runDailySearch(q) {
+  const resEl = document.getElementById('dailySearchResults');
+  if (!resEl) return;
+  resEl.style.display = 'block';
+  resEl.innerHTML = '<div style="color:#888;padding:12px 4px;font-size:13px">🔍 検索中...</div>';
+
+  try {
+    const { data, error } = await sb.from('sales_data')
+      .select('store_key, data_json, uploaded_at')
+      .like('store_key', 'daily_report_%')
+      .order('store_key', { ascending: false })
+      .limit(500);
+    if (error) throw new Error(error.message);
+
+    const kw = q.toLowerCase();
+    const hits = [];
+    (data || []).forEach(row => {
+      const d = row.data_json;
+      if (!d) return;
+      const haystack = [
+        d.memo || '',
+        d.submitted_by || '',
+        ...(d.staff_shifts || []).map(s => s.name || ''),
+        ...(d.contract_details || []).map(c => [c.stylist, c.name, c.plan].join(' ')),
+        ...(d.cancel_details || []).map(c => c.name || ''),
+      ].join(' ').toLowerCase();
+      if (haystack.includes(kw)) {
+        const storeLabel = (DAILY_STORES.find(s => s.key === d.store) || {}).label || d.store || '';
+        hits.push({ store_key: row.store_key, date: d.date, store: d.store, storeLabel, memo: d.memo || '', submitted_by: d.submitted_by || '', staff: (d.staff_shifts || []).map(s => s.name).filter(Boolean) });
+      }
+    });
+
+    if (!hits.length) {
+      resEl.innerHTML = '<div style="color:#888;padding:12px 4px;font-size:13px">「' + _esc(q) + '」に一致する日報はありません。</div>';
+      return;
+    }
+
+    const html = hits.map(h => {
+      const snippet = h.memo ? (h.memo.length > 60 ? h.memo.slice(0, 60) + '…' : h.memo) : '';
+      return `<div onclick="_dailySearchJump('${h.store}','${h.date}')" style="padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff;transition:background .15s" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='#fff'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-weight:600;font-size:14px">${_esc(h.storeLabel)}</span>
+          <span style="font-size:13px;color:#666">${_esc(h.date)}</span>
+        </div>
+        <div style="font-size:12px;color:#888">${h.staff.length ? _esc(h.staff.join('・')) : ''}</div>
+        ${snippet ? `<div style="font-size:12px;color:#555;margin-top:3px">${_esc(snippet)}</div>` : ''}
+      </div>`;
+    }).join('');
+    resEl.innerHTML = `<div style="font-size:12px;color:#888;margin-bottom:8px">${hits.length}件ヒット</div>` + html;
+  } catch (e) {
+    resEl.innerHTML = '<div style="color:#c00;padding:12px 4px;font-size:13px">エラー: ' + _esc(e.message) + '</div>';
+  }
+}
+
+function _dailySearchJump(storeKey, dateStr) {
+  clearDailySearch();
+  dailyStore = storeKey;
+  dailyDate = new Date(dateStr + 'T00:00:00');
+  renderDaily();
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 async function submitDailyReport(status = 'submitted') {

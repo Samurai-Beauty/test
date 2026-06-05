@@ -9,8 +9,9 @@
 //   ERROR_EMAIL        : エラー通知先メールアドレス（例: 辰巳大地のGmail）
 //
 // 【トリガー設定】
-//   weeklySync  → 毎週月曜 09:00
-//   monthlySync → 毎月1日  09:00
+//   realtimeSync → 毎分（時間ベース → 1分ごと）※カルテリアルタイム閲覧用
+//   weeklySync   → 毎週月曜 09:00
+//   monthlySync  → 毎月1日  09:00
 // ============================================================
 
 const SUPABASE_URL      = 'https://ifiamddyhbbrseglqesg.supabase.co';
@@ -30,6 +31,113 @@ const ELME_STORE_MAP = {
 // ============================================================
 // トリガーエントリポイント
 // ============================================================
+
+// ── リアルタイム閲覧用（毎分トリガー） ──────────────────────
+// 直近2時間のカルテ回答を個別データとして karte_live キーに保存
+// Supabase store_key: 'karte_live'
+function realtimeSync() {
+  const props        = PropertiesService.getScriptProperties();
+  const anthropicKey = props.getProperty('ANTHROPIC_API_KEY');
+  const elmeToken    = props.getProperty('ELME_OAUTH_TOKEN');
+  const sbKey        = props.getProperty('SUPABASE_SERVICE_KEY');
+
+  const to   = new Date();
+  const from = new Date(to.getTime() - 2 * 60 * 60 * 1000); // 直近2時間
+
+  try {
+    const responses = fetchKarteRaw(anthropicKey, elmeToken, from, to);
+    if (!responses || responses.length === 0) return;
+
+    // 既存データと合算（response_id で重複除去、最新200件）
+    const existing   = fetchSupabaseData('karte_live', sbKey) || [];
+    const existingIds = new Set(existing.map(function(r) { return r.response_id; }));
+    const newOnes    = responses.filter(function(r) { return !existingIds.has(r.response_id); });
+    if (newOnes.length === 0) return;
+
+    const merged = newOnes.concat(existing).slice(0, 200);
+
+    UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/sales_data', {
+      method:  'post',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':        sbKey,
+        'Authorization': 'Bearer ' + sbKey,
+        'Prefer':        'resolution=merge-duplicates',
+      },
+      payload: JSON.stringify({
+        store_key:   'karte_live',
+        data_json:   merged,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: 'gas_karte_realtime',
+      }),
+      muteHttpExceptions: true,
+    });
+
+    Logger.log('karte_live 更新: +' + newOnes.length + '件（合計' + merged.length + '件）');
+  } catch(e) {
+    Logger.log('realtimeSync エラー: ' + e.message);
+  }
+}
+
+// 個別フォーム回答を全フィールド付きで取得
+function fetchKarteRaw(anthropicKey, elmeToken, from, to) {
+  const prompt = [
+    'エルメのご新規カルテフォームの回答を取得してください。',
+    'bot_id: ' + ELME_BOT_ID,
+    'form_id: ' + ELME_FORM_ID,
+    '対象期間: ' + fmtDate(from) + ' から ' + fmtDate(to) + ' まで（answered_at で絞り込む）',
+    '',
+    '全件取得後、以下のJSON配列のみを返してください。余分な説明は不要です：',
+    '[',
+    '  {',
+    '    "response_id": <number>,',
+    '    "answered_at": "YYYY-MM-DDTHH:mm:ss",',
+    '    "store": "<来店店舗のvalue>",',
+    '    "inflow": "<流入経路のvalue>",',
+    '    "name": "<氏名（あれば）>",',
+    '    "phone": "<電話番号（あれば）>",',
+    '    "menu": "<希望メニュー（あれば）>"',
+    '  },',
+    '  ...',
+    ']',
+    '',
+    '対象期間外の回答は除外すること。フィールドがない場合は null とすること。',
+  ].join('\n');
+
+  const payload = {
+    model:      ANTHROPIC_MODEL,
+    max_tokens: 8192,
+    mcp_servers: [{
+      type:                'url',
+      url:                 ELME_MCP_URL,
+      name:                'elme',
+      authorization_token: elmeToken,
+    }],
+    messages: [{ role: 'user', content: prompt }],
+  };
+
+  const res = UrlFetchApp.fetch(ANTHROPIC_API_URL, {
+    method:  'post',
+    headers: {
+      'Content-Type':      'application/json',
+      'x-api-key':         anthropicKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta':    'mcp-client-2025-04-04',
+    },
+    payload:            JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  if (res.getResponseCode() !== 200) {
+    throw new Error('Anthropic API エラー ' + res.getResponseCode());
+  }
+
+  const body  = JSON.parse(res.getContentText());
+  const text  = body.content.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('JSONが返答に含まれていません: ' + text.slice(0, 200));
+  return JSON.parse(match[0]);
+}
 
 // 毎週月曜 09:00 に実行（直近7日分）
 function weeklySync() {
