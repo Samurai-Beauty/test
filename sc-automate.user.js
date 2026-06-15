@@ -20,6 +20,10 @@
   var POLL_MS  = 4000;   // タスク確認間隔（ms）
   var SAVE_WAIT_MS = 2500; // 保存後の待機時間
 
+  // 事前テスト用：true にすると「保存せず」フォームに入力結果を表示するだけ（プレビュー）。
+  // 各スタッフごとに一時停止し、カレンダーを目視確認 → [次へ] で進む。本番では false に戻す。
+  var DRY_RUN = false;
+
   // Salon Connect スタッフID → { name: サムライ名, shopId: 店舗ID }
   // ※ shopId: 西新宿=7701, 三丁目=7487, 渋谷=7699
   var STAFF_MAP = {
@@ -139,6 +143,30 @@
 
   function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── 事前テスト（プレビュー）用 ─────────────────────────────────────────
+  function logPlan(name, shopId, dayPlan) {
+    var rows = dayPlan.filter(function(p){ return p.status !== 'skip'; }).map(function(p){
+      return { 日付: p.dateStr, 状態: p.status === 'work' ? '出勤' : '休み', パターンID: p.pid || '' };
+    });
+    console.log('%c[SC同期] ' + name + '（店舗' + shopId + '）', 'font-weight:bold;color:#0f3460');
+    if (console.table) console.table(rows); else console.log(rows);
+  }
+
+  function showPreview(name, workN, remaining, done, total, onNext) {
+    if (!_uiEl) showUI('', done, total);
+    _uiEl.innerHTML = [
+      '<div style="font-weight:800;font-size:14px;margin-bottom:8px">👀 プレビュー（保存しません）</div>',
+      '<div style="margin-bottom:8px"><b>' + escHtml(name) + '</b>：出勤 ' + workN + '日を入力しました。<br>カレンダーを目視確認してください。</div>',
+      '<div style="font-size:11px;opacity:.75;margin-bottom:10px">進捗 ' + done + ' / ' + total + '名（残り' + remaining + '名）</div>',
+      '<button id="sc-prev-next" style="padding:6px 16px;background:#4fc3f7;color:#06243a;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:800">次のスタッフへ ▶</button>',
+      '<button id="sc-prev-stop" style="margin-left:8px;padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:7px;cursor:pointer;font-size:12px">■ 終了</button>',
+    ].join('');
+    document.getElementById('sc-prev-next').onclick = function(){ onNext(); };
+    document.getElementById('sc-prev-stop').onclick = function(){
+      _stopped = true; setPlan(null); showUI('⛔ プレビューを終了しました', 0, 0); setTimeout(hideUI, 3000);
+    };
   }
 
   // ── シフト計算 ─────────────────────────────────────────────────────────
@@ -268,6 +296,13 @@
     });
 
     if (remaining.length === 0) {
+      if (DRY_RUN) {
+        // プレビュー完了：タスクは消さず、本番実行を促す
+        showUI('👀 プレビュー完了（保存なし）。問題なければ DRY_RUN を false にして再実行してください。',
+               plan.staffIds.length, plan.staffIds.length);
+        setPlan(null);
+        return;
+      }
       showUI('✅ 全' + plan.staffIds.length + '名の同期が完了しました！', plan.staffIds.length, plan.staffIds.length);
       setPlan(null);
       sbDelete(TASK_STORE_KEY);
@@ -305,6 +340,18 @@
       var mon  = parseInt(ym.slice(4, 6), 10);
       var dayPlan = calcPlan(name, year, mon, plan.shiftData, shopId);
       var filled  = fillForm(dayPlan);
+      logPlan(name, shopId, dayPlan);
+
+      // ── 事前テスト（プレビュー）：保存せず目視確認させる ──
+      if (DRY_RUN) {
+        var workN = dayPlan.filter(function(p){ return p.status === 'work'; }).length;
+        showPreview(name, workN, remaining.length, done, total, function() {
+          plan.done.push(nextId);
+          setPlan(plan);
+          goNext();
+        });
+        return;
+      }
 
       showUI(name + ': ' + filled + '日入力、保存中…', done, total);
 
@@ -397,13 +444,15 @@
         var names = ids.map(function(id){ return STAFF_MAP[id] ? STAFF_MAP[id].name : 'ID:'+id; }).join('、');
 
         if (!confirm(
-          '【サムライ SC自動同期】\n\n' +
-          year + '年' + mon + '月のシフトを全スタッフ自動入力します。\n\n' +
+          (DRY_RUN ? '【サムライ SC同期：プレビュー（保存しません）】\n\n'
+                   : '【サムライ SC自動同期】\n\n') +
+          year + '年' + mon + '月のシフトを全スタッフに' + (DRY_RUN ? '入力（保存なし）' : '自動入力・保存') + 'します。\n\n' +
           '対象(' + ids.length + '名): ' + names + '\n\n' +
-          '自動でフォームを入力・保存します。よろしいですか？'
+          (DRY_RUN ? 'スタッフごとに一時停止し、目視確認しながら進めます。よろしいですか？'
+                   : '自動でフォームを入力・保存します。よろしいですか？')
         )) {
           setPlan(null);
-          sbDelete(TASK_STORE_KEY);
+          if (!DRY_RUN) sbDelete(TASK_STORE_KEY);
           return;
         }
 
