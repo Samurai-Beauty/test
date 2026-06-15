@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      1.2.0
-// @description  サムライシステムで公開したシフトをSalon Connectに全スタッフ自動入力する（店舗別パターンID・店舗振替対応）
+// @version      2.0.0
+// @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
 // @grant        none
@@ -24,16 +24,36 @@
   // 各スタッフごとに一時停止し、カレンダーを目視確認 → [次へ] で進む。本番では false に戻す。
   var DRY_RUN = false;
 
-  // Salon Connect スタッフID → { name: サムライ名, shopId: 店舗ID }
-  // ※ shopId: 西新宿=7701, 三丁目=7487, 渋谷=7699
-  var STAFF_MAP = {
-    '46693': { name: '高橋里奈',   shopId: '7701' }, // 西新宿
-    '47922': { name: '沖中真奈',   shopId: '7487' }, // 三丁目
-    '47923': { name: '清瀬陽香',   shopId: '7701' }, // 西新宿
-    '48968': { name: '矢澤南奈',   shopId: '7701' }, // 西新宿
-    '49731': { name: '三浦さら',   shopId: '7487' }, // 三丁目
-    // 新スタッフ追加時: 'XXXXX': { name: '名前', shopId: '7701' },
+  // サムライ名 → 店舗別 Salon Connect アカウントID（2026年7月確認済み）
+  // ※ 各スタッフは「勤務する店舗ごとに別アカウント」を持つ。
+  //    その日の実働店舗（店舗振替を考慮）に対応するアカウントへ書き込む＝混在しない。
+  //    shopId: 西新宿=7701, 三丁目=7487, 渋谷=7699
+  var STAFF_ACCOUNTS = {
+    '矢澤南奈': { '7701':'47849', '7487':'48968' },
+    '清瀬陽香': { '7701':'48970', '7487':'47923' },
+    '高橋里奈': { '7701':'47851', '7487':'46693' },
+    '岡部実結': { '7701':'48969', '7487':'48455' },
+    '沖中真奈': { '7701':'48219', '7487':'47922' },
+    '三浦さら': {                 '7487':'49731' }, // 三丁目のみ
   };
+  // スタッフの自店（店舗振替が無い日のデフォルト勤務店）
+  var STAFF_HOME = {
+    '矢澤南奈':'7701','清瀬陽香':'7701','高橋里奈':'7701','岡部実結':'7701',
+    '沖中真奈':'7487','三浦さら':'7487',
+  };
+  var SHOP_LABEL = { '7701':'西新宿', '7487':'三丁目', '7699':'渋谷' };
+
+  // 全アカウント（スタッフ×店舗）を1リストに展開
+  function buildAccounts() {
+    var list = [];
+    Object.keys(STAFF_ACCOUNTS).forEach(function(name) {
+      var accs = STAFF_ACCOUNTS[name];
+      Object.keys(accs).forEach(function(store) {
+        list.push({ name: name, store: store, scId: accs[store] });
+      });
+    });
+    return list;
+  }
 
   // サムライ シフトキー → Salon Connect シフトパターンID（店舗別／2026年7月確認済み）
   // ※ 店舗ごとにパターンIDが異なるため shopId で引く（混在防止の最重要ポイント）
@@ -183,12 +203,13 @@
     return v !== undefined ? v : null;
   }
 
-  function calcPlan(staffName, year, mon, shiftData, homeShopId) {
+  // store = このアカウントの店舗。その日の実働店舗が store と一致する日だけ「出勤」、
+  // それ以外は必ず「休み」。全日を明示的に上書きするのでゴミ（出1 等）が残らない。
+  function calcPlan(staffName, year, mon, shiftData, store) {
     var ssched = shiftData.ssched        || {};
     var stimes = shiftData.ssched_times  || {};
     var sstore = shiftData.ssched_stores || {};
-    var sreq   = shiftData.sreq          || {};
-    var pub    = shiftData.spub === '1';
+    var home   = STAFF_HOME[staffName] || store;
     var days   = new Date(year, mon, 0).getDate();
     var mp     = String(mon).padStart(2, '0');
     var result = [];
@@ -197,33 +218,17 @@
       var dateStr= year + '-' + mp + '-' + String(d).padStart(2, '0');
       var inSch  = (ssched[ds] || []).indexOf(staffName) >= 0;
       var tkey   = (stimes[ds] || {})[staffName];
-      var rkey   = (sreq[staffName] || {})[ds];
-      // 店舗振替：その日だけ別店舗で勤務する場合（例: 西新宿スタッフが三丁目ヘルプ）
-      var ovStore   = (sstore[ds] || {})[staffName];
-      var ovShopId  = ovStore ? (STORE_SHOP[ovStore] || null) : null;
-      var awayShift = ovShopId && ovShopId !== homeShopId; // 自店以外で勤務
-      var status, pid;
+      var pid    = null;
 
-      if (inSch && !awayShift) {
-        if (tkey === 'off') {
-          status = 'off';
-        } else if (tkey) {
-          pid = resolvePid(tkey, homeShopId);
-          status = pid !== null ? 'work' : 'off';
-        } else {
-          // 時間未指定 → 自店のフル枠で出勤扱い
-          pid = resolvePid('full', homeShopId);
-          status = 'work';
+      if (inSch && tkey !== 'off') {
+        // その日の実働店舗（振替があればその店、無ければ自店）
+        var ovStore = (sstore[ds] || {})[staffName];
+        var effShop = ovStore ? (STORE_SHOP[ovStore] || home) : home;
+        if (effShop === store) {
+          pid = resolvePid(tkey || 'full', store);
         }
-      } else if (awayShift) {
-        // 他店ヘルプの日は自店のSCでは「休み」（他店のSCページで別途入力が必要）
-        status = 'off';
-      } else if (rkey === 'off' || (pub && !inSch)) {
-        status = 'off';
-      } else {
-        status = 'skip';
       }
-      result.push({ dateStr: dateStr, status: status, pid: pid });
+      result.push({ dateStr: dateStr, status: pid ? 'work' : 'off', pid: pid });
     }
     return result;
   }
@@ -285,126 +290,110 @@
     return false;
   }
 
-  // ── メイン同期ループ ─────────────────────────────────────────────────
+  // ── メイン同期ループ（アカウント単位＝スタッフ×店舗） ────────────────
+  function gotoAccount(scId, ym) {
+    location.href =
+      '/client_admin/staff_day_shift.php' +
+      '?select_staff=' + encodeURIComponent(scId) +
+      '&yearmonth=' + encodeURIComponent(ym);
+  }
+
   function runNext() {
     if (_stopped) return;
     var plan = getPlan();
-    if (!plan) return;
+    if (!plan || !plan.accounts) return;
 
-    var remaining = plan.staffIds.filter(function(id) {
-      return plan.done.indexOf(id) < 0;
+    var remaining = plan.accounts.filter(function(a) {
+      return plan.done.indexOf(a.scId) < 0;
     });
+    var total = plan.accounts.length;
+    var done  = total - remaining.length;
 
     if (remaining.length === 0) {
       if (DRY_RUN) {
-        // プレビュー完了：タスクは消さず、本番実行を促す
-        showUI('👀 プレビュー完了（保存なし）。問題なければ DRY_RUN を false にして再実行してください。',
-               plan.staffIds.length, plan.staffIds.length);
+        showUI('👀 プレビュー完了（保存なし）。問題なければ DRY_RUN を false にして再実行してください。', total, total);
         setPlan(null);
         return;
       }
-      showUI('✅ 全' + plan.staffIds.length + '名の同期が完了しました！', plan.staffIds.length, plan.staffIds.length);
+      showUI('✅ 全' + total + 'アカウントの同期が完了しました！', total, total);
       setPlan(null);
       sbDelete(TASK_STORE_KEY);
       setTimeout(hideUI, 6000);
       return;
     }
 
-    var total   = plan.staffIds.length;
-    var done    = total - remaining.length;
-    var nextId  = remaining[0];
-    var info    = STAFF_MAP[nextId];
-    var name    = info ? info.name : ('ID:' + nextId);
-    var shopId  = info ? info.shopId : '';
-    var ym      = plan.ym;  // '202606'
+    var next  = remaining[0];
+    var name  = next.name;
+    var store = next.store;
+    var scId  = next.scId;
+    var label = name + '（' + (SHOP_LABEL[store] || store) + '）';
+    var ym    = plan.ym;  // '202607'
 
-    showUI(name + ' を処理中…（残り' + remaining.length + '名）', done, total);
+    showUI(label + ' を処理中…（残り' + remaining.length + '件）', done, total);
 
-    // 現在ページ確認
     var params = new URLSearchParams(location.search);
     var curStaff = params.get('select_staff');
     var curYm    = params.get('yearmonth');
     var onShiftPage = location.pathname.indexOf('staff_day_shift') >= 0;
 
-    if (onShiftPage && curStaff === nextId && curYm === ym) {
-      // 正しいページにいる → 入力して保存
-      if (!info) {
-        // マッピング不明 → スキップ
-        plan.done.push(nextId);
-        setPlan(plan);
-        runNext();
-        return;
-      }
-
+    if (onShiftPage && curStaff === scId && curYm === ym) {
+      // 正しいアカウントのページにいる → 入力
       var year = parseInt(ym.slice(0, 4), 10);
       var mon  = parseInt(ym.slice(4, 6), 10);
-      var dayPlan = calcPlan(name, year, mon, plan.shiftData, shopId);
+      var dayPlan = calcPlan(name, year, mon, plan.shiftData, store);
       var filled  = fillForm(dayPlan);
-      logPlan(name, shopId, dayPlan);
+      logPlan(label, store, dayPlan);
 
-      // ── 事前テスト（プレビュー）：保存せず目視確認させる ──
+      // ── 事前テスト（プレビュー）：保存せず目視確認 ──
       if (DRY_RUN) {
         var workN = dayPlan.filter(function(p){ return p.status === 'work'; }).length;
-        showPreview(name, workN, remaining.length, done, total, function() {
-          plan.done.push(nextId);
+        showPreview(label, workN, remaining.length, done, total, function() {
+          plan.done.push(scId);
           setPlan(plan);
           goNext();
         });
         return;
       }
 
-      showUI(name + ': ' + filled + '日入力、保存中…', done, total);
+      showUI(label + ': ' + filled + '日設定、保存中…', done, total);
 
       setTimeout(function() {
         if (_stopped) return;
         var saved = clickSave();
         if (!saved) {
-          // 保存ボタン未発見 → 手動保存を促してスキップ
-          showUI('⚠️ ' + name + ': 保存ボタンが見つかりません。手動で保存してください。', done, total);
+          showUI('⚠️ ' + label + ': 保存ボタンが見つかりません。手動で保存してください。', done, total);
           setTimeout(function() {
-            plan.done.push(nextId);
+            plan.done.push(scId);
             setPlan(plan);
             runNext();
           }, 5000);
           return;
         }
-
-        // 保存クリック後: ページリロードか AJAX 完了を待つ
-        // ページリロードが起きれば Tampermonkey が再起動してここから続く
-        // AJAX なら SAVE_WAIT_MS 後に自動で次へ
-        plan.done.push(nextId);
+        plan.done.push(scId);
         setPlan(plan);
 
         setTimeout(function() {
           if (_stopped) return;
-          // まだ同じページにいれば AJAX 保存 → 次のスタッフへ移動
+          // AJAX保存でページが変わらなければ次のアカウントへ
           if (location.pathname.indexOf('staff_day_shift') >= 0 &&
-              new URLSearchParams(location.search).get('select_staff') === nextId) {
+              new URLSearchParams(location.search).get('select_staff') === scId) {
             goNext();
           }
-          // ページリロードが起きた場合は window.onload で runNext() が呼ばれる
+          // ページリロードが起きた場合は onPageReady → runNext() で続行
         }, SAVE_WAIT_MS);
       }, 600);
 
     } else {
-      // 次のスタッフのページへ移動
       goNext();
     }
 
     function goNext() {
       if (_stopped) return;
       var plan2 = getPlan();
-      if (!plan2) return;
-      var rem2 = plan2.staffIds.filter(function(id){ return plan2.done.indexOf(id) < 0; });
+      if (!plan2 || !plan2.accounts) return;
+      var rem2 = plan2.accounts.filter(function(a){ return plan2.done.indexOf(a.scId) < 0; });
       if (rem2.length === 0) { runNext(); return; }
-      var nId   = rem2[0];
-      var nInfo = STAFF_MAP[nId];
-      var nShop = nInfo ? nInfo.shopId : '';
-      location.href =
-        '/client_admin/staff_day_shift.php' +
-        '?select_staff=' + encodeURIComponent(nId) +
-        (nShop ? '&select_procshop=' + encodeURIComponent(nShop) : '') +
-        '&yearmonth=' + encodeURIComponent(plan2.ym);
+      gotoAccount(rem2[0].scId, plan2.ym);
     }
   }
 
@@ -412,9 +401,9 @@
   function onPageReady() {
     var plan = getPlan();
 
-    if (plan) {
+    if (plan && plan.accounts) {
       // ローカルプランあり → 同期を続ける
-      showUI('同期を再開しています…', 0, plan.staffIds.length);
+      showUI('同期を再開しています…', 0, plan.accounts.length);
       setTimeout(runNext, 1200);
       return;
     }
@@ -428,12 +417,12 @@
 
         clearInterval(pollTimer);
 
-        // タスクをローカルプランに変換
-        var ids = task.staffIds || Object.keys(STAFF_MAP);
+        // タスクをローカルプランに変換（アカウント割り当ては userscript 側で解決）
+        var accounts = buildAccounts();
         var newPlan = {
           ym:        task.ym,
           shiftData: task.shiftData,
-          staffIds:  ids,
+          accounts:  accounts,
           done:      [],
         };
         setPlan(newPlan);
@@ -441,14 +430,15 @@
         // 確認ダイアログ
         var year = task.ym.slice(0, 4);
         var mon  = parseInt(task.ym.slice(4, 6), 10);
-        var names = ids.map(function(id){ return STAFF_MAP[id] ? STAFF_MAP[id].name : 'ID:'+id; }).join('、');
+        var names = Object.keys(STAFF_ACCOUNTS).join('、');
 
         if (!confirm(
           (DRY_RUN ? '【サムライ SC同期：プレビュー（保存しません）】\n\n'
                    : '【サムライ SC自動同期】\n\n') +
-          year + '年' + mon + '月のシフトを全スタッフに' + (DRY_RUN ? '入力（保存なし）' : '自動入力・保存') + 'します。\n\n' +
-          '対象(' + ids.length + '名): ' + names + '\n\n' +
-          (DRY_RUN ? 'スタッフごとに一時停止し、目視確認しながら進めます。よろしいですか？'
+          year + '年' + mon + '月のシフトを全アカウントに' + (DRY_RUN ? '入力（保存なし）' : '自動入力・保存') + 'します。\n\n' +
+          '対象(' + Object.keys(STAFF_ACCOUNTS).length + '名 / ' + accounts.length + 'アカウント): ' + names + '\n\n' +
+          '※各スタッフの「その日の実働店舗」に対応するアカウントへ振り分けます。\n\n' +
+          (DRY_RUN ? 'アカウントごとに一時停止し、目視確認しながら進めます。よろしいですか？'
                    : '自動でフォームを入力・保存します。よろしいですか？')
         )) {
           setPlan(null);
