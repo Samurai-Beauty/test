@@ -1298,14 +1298,17 @@ const STORE_MEMBERS = {
   shibuya:       ['中山菜々江', '山本樹', '岡田颯太'],
 };
 
-// Salon Connect スタッフID対応表（sc-sync.js / sc-automate.user.js と共通）
-// shopId: 西新宿=7701, 三丁目=7487, 渋谷=7699
-const SC_STAFF_IDS = {
-  '46693': { name: '高橋里奈',   shopId: '7701' }, // 西新宿
-  '47922': { name: '沖中真奈',   shopId: '7487' }, // 三丁目
-  '47923': { name: '清瀬陽香',   shopId: '7701' }, // 西新宿
-  '48968': { name: '矢澤南奈',   shopId: '7701' }, // 西新宿
-  '49731': { name: '三浦さら',   shopId: '7487' }, // 三丁目
+// Salon Connect スタッフ → 店舗別アカウントID（sc-automate.user.js と共通）
+// ※ 各スタッフは「勤務する店舗ごとに別アカウント」を持つ。
+//    その日の実働店舗（店舗振替 ssched_stores を考慮）に対応するアカウントへ書き込む。
+//    店舗キー: nishishinjuku=西新宿(7701), sanchome=三丁目(7487), shibuya=渋谷(7699)
+const SC_STAFF_ACCOUNTS = {
+  '矢澤南奈': { nishishinjuku: '47849', sanchome: '48968' },
+  '清瀬陽香': { nishishinjuku: '48970', sanchome: '47923' },
+  '高橋里奈': { nishishinjuku: '47851', sanchome: '46693' },
+  '岡部実結': { nishishinjuku: '48969', sanchome: '48455' },
+  '沖中真奈': { nishishinjuku: '48219', sanchome: '47922' },
+  '三浦さら': {                          sanchome: '49731' }, // 三丁目のみ
 };
 const HONSHA_MEMBERS = STORE_MEMBERS.honsha;
 const DEFAULT_MEMBERS = [
@@ -4306,13 +4309,14 @@ async function startSalonConnectSync() {
   const ym = `${y}${String(m).padStart(2, '0')}`;  // '202606'
   const monthLabel = `${y}年${m}月`;
 
-  const staffIds = Object.keys(SC_STAFF_IDS);
-  const names = staffIds.map(id => SC_STAFF_IDS[id].name).join('、');
+  const staffNames = Object.keys(SC_STAFF_ACCOUNTS);
+  const names = staffNames.join('、');
+  const accountCount = staffNames.reduce((n, name) => n + Object.keys(SC_STAFF_ACCOUNTS[name]).length, 0);
 
   if (!confirm(
     `【Salon Connect 全員同期】\n\n` +
     `${monthLabel}のシフトを Salon Connect に自動入力します。\n\n` +
-    `対象(${staffIds.length}名): ${names}\n\n` +
+    `対象(${staffNames.length}名 / ${accountCount}アカウント): ${names}\n\n` +
     `・Tampermonkey スクリプトが必要です\n` +
     `・Salon Connect にログイン済みであることを確認してください\n\n` +
     `続けますか？`
@@ -4333,7 +4337,7 @@ async function startSalonConnectSync() {
   const task = {
     ym:        ym,
     shiftData: rows.data_json,
-    staffIds:  staffIds,
+    staffNames: staffNames,        // アカウント割り当ては userscript 側の SC_ACCOUNTS で解決
     status:    'pending',
     createdAt: new Date().toISOString(),
   };
