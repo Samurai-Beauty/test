@@ -747,6 +747,15 @@
           <div class="shift-summary" id="shiftReqSummary" style="margin-top:10px"></div>
         </div>
 
+        <!-- みんなの提出状況（スタイリストも他メンバーの状況を確認できる） -->
+        <div class="card" id="shiftReqPeerCard" style="padding:14px 20px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:700;color:#555">みんなの提出状況</span>
+            <span id="shiftReqPeerCount" style="font-size:12px;color:#888"></span>
+          </div>
+          <div id="shiftReqPeerStatus" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+
         <div class="card">
           <div id="shiftReqCalendar"></div>
         </div>
@@ -3709,6 +3718,61 @@ function renderShiftRequest() {
   });
   html += '</div>';
   document.getElementById('shiftReqCalendar').innerHTML = html;
+
+  // みんなの提出状況（自分が閲覧できる店舗のメンバー）
+  renderPeerSubmitStatus(y, m);
+  refreshPeerSubmitStatus(y, m);
+}
+
+// シフト希望提出 — 自分が見られる店舗の全メンバーを取得
+function getPeerMembersForReq() {
+  const stores = getAllowedViewStores();
+  const result = [];
+  stores.forEach(store => {
+    getMembersOfStore(store).forEach(n => { if (!result.includes(n)) result.push(n); });
+  });
+  return result;
+}
+
+// 提出状況バッジを描画（提出/未提出のみ。希望の中身は表示しない＝プライバシー保持）
+function renderPeerSubmitStatus(y, m) {
+  const box = document.getElementById('shiftReqPeerStatus');
+  const cnt = document.getElementById('shiftReqPeerCount');
+  if (!box) return;
+  const members = getPeerMembersForReq();
+  if (members.length === 0) {
+    box.innerHTML = '<span style="font-size:12px;color:#aaa">表示できるメンバーがいません</span>';
+    if (cnt) cnt.textContent = '';
+    return;
+  }
+  const subCount = members.filter(n => isSubmitted(y, m, n)).length;
+  if (cnt) cnt.textContent = `（${subCount}/${members.length}名 提出済み）`;
+  box.innerHTML = members.map(name => {
+    const done  = isSubmitted(y, m, name);
+    const meCss = name === currentUser ? 'outline:2px solid #3d5afe;outline-offset:1px;' : '';
+    const base  = done
+      ? 'background:#d4edda;color:#155724;'
+      : 'background:#f8d7da;color:#721c24;border:1.5px solid #f5c6cb;';
+    return `<span style="font-size:12px;padding:4px 12px;border-radius:20px;font-weight:700;${base}${meCss}">${name} ${done ? '✓' : '未提出'}</span>`;
+  }).join('');
+}
+
+// Supabase から最新の提出フラグ(ssub)のみ取得して再描画（自分の希望データは上書きしない）
+async function refreshPeerSubmitStatus(y, m) {
+  try {
+    const ym = `${y}-${String(m).padStart(2, '0')}`;
+    const { data } = await sb.from('sales_data')
+      .select('data_json').eq('store_key', `shift_${ym}`).maybeSingle();
+    const sub = data && data.data_json && data.data_json.ssub;
+    if (sub) {
+      Object.entries(sub).forEach(([name, val]) => {
+        // 自分の「提出済み」はローカルを優先（送信直後にリモートが古くても巻き戻さない）
+        if (name === currentUser && isSubmitted(y, m, currentUser)) return;
+        localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, val);
+      });
+    }
+  } catch (e) { /* オフライン時はローカル表示のまま */ }
+  if (shiftReqMonth.y === y && shiftReqMonth.m === m) renderPeerSubmitStatus(y, m);
 }
 
 let shiftPickerDay = null;
