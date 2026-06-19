@@ -1401,7 +1401,7 @@ const SHIFT_OPTIONS = [
   { key: 'h11-22',  label: '11:00-22:00', sub: '土日祝のみ' },
   { key: 'h11-17',  label: '11:00-17:00', sub: '土日祝のみ' },
   { key: 'early',   label: '13:00-18:00', sub: '早番' },
-  { key: 'late',    label: '17:00-22:00', sub: '遅番' },
+  { key: 'late',    label: '16:00-22:00', sub: '遅番' },
   { key: 'full',    label: '13:00-22:00', sub: '平日フル' },
   { key: 'omakase', label: 'お任せシフト', sub: '' },
   { key: 'off',     label: '休日希望',     sub: '' },
@@ -1410,12 +1410,12 @@ const SHIFT_OPTIONS = [
 // シフト閲覧用の短縮時間ラベル
 const SHIFT_SHORT = {
   'h11-22': '11-22', 'h11-17': '11-17',
-  'early': '13-18',  'late':   '17-22',
+  'early': '13-18',  'late':   '16-22',
   'full':  '13-22',  'off':    '休',    'omakase': '任'
 };
 const SHIFT_LONG = {
   'h11-22': '11:00-22:00', 'h11-17': '11:00-17:00',
-  'early': '13:00-18:00',  'late':   '17:00-22:00',
+  'early': '13:00-18:00',  'late':   '16:00-22:00',
   'full':  '13:00-22:00',  'off':    '休み',         'omakase': 'お任せ'
 };
 function shiftShort(key) {
