@@ -1306,7 +1306,6 @@ const SC_STAFF_ACCOUNTS = {
   '矢澤南奈': { nishishinjuku: '47849', sanchome: '48968' },
   '清瀬陽香': { nishishinjuku: '48970', sanchome: '47923' },
   '高橋里奈': { nishishinjuku: '47851', sanchome: '46693' },
-  '岡部実結': { nishishinjuku: '48969', sanchome: '48455' },
   '沖中真奈': { nishishinjuku: '48219', sanchome: '47922' },
   '三浦さら': {                          sanchome: '49731' }, // 三丁目のみ
 };
@@ -1402,7 +1401,7 @@ const SHIFT_OPTIONS = [
   { key: 'h11-22',  label: '11:00-22:00', sub: '土日祝のみ' },
   { key: 'h11-17',  label: '11:00-17:00', sub: '土日祝のみ' },
   { key: 'early',   label: '13:00-18:00', sub: '早番' },
-  { key: 'late',    label: '17:00-22:00', sub: '遅番' },
+  { key: 'late',    label: '16:00-22:00', sub: '遅番' },
   { key: 'full',    label: '13:00-22:00', sub: '平日フル' },
   { key: 'omakase', label: 'お任せシフト', sub: '' },
   { key: 'off',     label: '休日希望',     sub: '' },
@@ -1411,12 +1410,12 @@ const SHIFT_OPTIONS = [
 // シフト閲覧用の短縮時間ラベル
 const SHIFT_SHORT = {
   'h11-22': '11-22', 'h11-17': '11-17',
-  'early': '13-18',  'late':   '17-22',
+  'early': '13-18',  'late':   '16-22',
   'full':  '13-22',  'off':    '休',    'omakase': '任'
 };
 const SHIFT_LONG = {
   'h11-22': '11:00-22:00', 'h11-17': '11:00-17:00',
-  'early': '13:00-18:00',  'late':   '17:00-22:00',
+  'early': '13:00-18:00',  'late':   '16:00-22:00',
   'full':  '13:00-22:00',  'off':    '休み',         'omakase': 'お任せ'
 };
 function shiftShort(key) {
@@ -3292,6 +3291,7 @@ function getShiftHours(key) {
 // 個別月の期限上書き（全員向け特例延長）
 const SHIFT_DEADLINE_OVERRIDES = {
   '2026-6': new Date(2026, 4, 3, 23, 59, 59, 999), // 6月分は5月3日 23:59 まで延長
+  '2026-8': new Date(2026, 6, 5, 23, 59, 59, 999), // 8月分は7月5日 23:59 まで延長（全員）
 };
 // ユーザー別の期限上書き（特定スタッフのみ個別延長）
 const SHIFT_DEADLINE_USER_OVERRIDES = {
