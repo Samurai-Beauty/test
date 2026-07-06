@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      2.0.2
+// @version      2.0.3
 // @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
 // @grant        none
 // @run-at       document-idle
+// @updateURL    https://samurai-beauty.github.io/test/sc-automate.user.js
+// @downloadURL  https://samurai-beauty.github.io/test/sc-automate.user.js
 // ==/UserScript==
 
 (function () {
@@ -399,14 +401,59 @@
     }
   }
 
+  // タスク → ローカルプランへ変換して同期開始（確認ダイアログあり）
+  function startFromTask(task) {
+    // タスクをローカルプランに変換（アカウント割り当ては userscript 側で解決）
+    var accounts = buildAccounts();
+    var newPlan = {
+      ym:            task.ym,
+      shiftData:     task.shiftData,
+      accounts:      accounts,
+      done:          [],
+      taskCreatedAt: task.createdAt || null,  // 新旧タスクの判別用
+    };
+    setPlan(newPlan);
+
+    // 確認ダイアログ
+    var year = String(task.ym).slice(0, 4);
+    var mon  = parseInt(String(task.ym).slice(4, 6), 10);
+    var names = Object.keys(STAFF_ACCOUNTS).join('、');
+
+    if (!confirm(
+      (DRY_RUN ? '【サムライ SC同期：プレビュー（保存しません）】\n\n'
+               : '【サムライ SC自動同期】\n\n') +
+      year + '年' + mon + '月のシフトを全アカウントに' + (DRY_RUN ? '入力（保存なし）' : '自動入力・保存') + 'します。\n\n' +
+      '対象(' + Object.keys(STAFF_ACCOUNTS).length + '名 / ' + accounts.length + 'アカウント): ' + names + '\n\n' +
+      '※各スタッフの「その日の実働店舗」に対応するアカウントへ振り分けます。\n\n' +
+      (DRY_RUN ? 'アカウントごとに一時停止し、目視確認しながら進めます。よろしいですか？'
+               : '自動でフォームを入力・保存します。よろしいですか？')
+    )) {
+      setPlan(null);
+      if (!DRY_RUN) sbDelete(TASK_STORE_KEY);
+      return;
+    }
+
+    runNext();
+  }
+
   // ── 起動処理 ─────────────────────────────────────────────────────────
   function onPageReady() {
     var plan = getPlan();
 
     if (plan && plan.accounts) {
-      // ローカルプランあり → 同期を続ける
-      showUI('同期を再開しています…', 0, plan.accounts.length);
-      setTimeout(runNext, 1200);
+      // ローカルプランあり。ただし「新しいタスク」が作成されていれば作り直す。
+      // （前回の同期が途中終了した際の残留プランが、新しい月のタスクを乗っ取るのを防ぐ）
+      sbGet(TASK_STORE_KEY).then(function(rows) {
+        var task = (rows && rows[0]) ? rows[0].data_json : null;
+        var isNewTask = task && task.status === 'pending' &&
+                        task.createdAt && task.createdAt !== plan.taskCreatedAt;
+        if (isNewTask) {
+          startFromTask(task);  // 新しいタスク → プランを作り直して開始
+        } else {
+          showUI('同期を再開しています…', 0, plan.accounts.length);
+          setTimeout(runNext, 1200);
+        }
+      });
       return;
     }
 
@@ -418,37 +465,7 @@
         if (!task || task.status !== 'pending') return;
 
         clearInterval(pollTimer);
-
-        // タスクをローカルプランに変換（アカウント割り当ては userscript 側で解決）
-        var accounts = buildAccounts();
-        var newPlan = {
-          ym:        task.ym,
-          shiftData: task.shiftData,
-          accounts:  accounts,
-          done:      [],
-        };
-        setPlan(newPlan);
-
-        // 確認ダイアログ
-        var year = task.ym.slice(0, 4);
-        var mon  = parseInt(task.ym.slice(4, 6), 10);
-        var names = Object.keys(STAFF_ACCOUNTS).join('、');
-
-        if (!confirm(
-          (DRY_RUN ? '【サムライ SC同期：プレビュー（保存しません）】\n\n'
-                   : '【サムライ SC自動同期】\n\n') +
-          year + '年' + mon + '月のシフトを全アカウントに' + (DRY_RUN ? '入力（保存なし）' : '自動入力・保存') + 'します。\n\n' +
-          '対象(' + Object.keys(STAFF_ACCOUNTS).length + '名 / ' + accounts.length + 'アカウント): ' + names + '\n\n' +
-          '※各スタッフの「その日の実働店舗」に対応するアカウントへ振り分けます。\n\n' +
-          (DRY_RUN ? 'アカウントごとに一時停止し、目視確認しながら進めます。よろしいですか？'
-                   : '自動でフォームを入力・保存します。よろしいですか？')
-        )) {
-          setPlan(null);
-          if (!DRY_RUN) sbDelete(TASK_STORE_KEY);
-          return;
-        }
-
-        runNext();
+        startFromTask(task);
       });
     }, POLL_MS);
   }

@@ -3512,7 +3512,7 @@ async function saveShiftToSupabase(y, m) {
     ssched_times:  mergedSchedTimes,
     ssched_stores: mergedSchedStores,
     spub:          isPublished(y, m) ? '1' : (remoteData.spub || null), // 公開済みなら保持
-    ssub,
+    ssub:          { ...(remoteData.ssub || {}), ...ssub }, // リモートの提出フラグを保持（他端末で提出済みを消さない）
   };
   const { error } = await sb.from('sales_data').upsert({
     store_key:   storeKey,
@@ -3869,6 +3869,28 @@ function renderShiftManage() {
     document.getElementById('manageReqContent').style.display = 'none';
     document.getElementById('manageSchedContent').style.display = 'block';
     renderManageSchedCal(y, m);
+  }
+  // Supabaseから最新の提出フラグを取得してバナー・提出状況を再描画（デバイス間同期のズレを解消）
+  refreshManageSubmitStatus(y, m);
+}
+
+// 管理ビュー用: Supabaseから最新のssub(提出フラグ)を取得しローカルへ反映して再描画
+async function refreshManageSubmitStatus(y, m) {
+  try {
+    const ym = `${y}-${String(m).padStart(2, '0')}`;
+    const { data } = await sb.from('sales_data')
+      .select('data_json').eq('store_key', `shift_${ym}`).maybeSingle();
+    const sub = data && data.data_json && data.data_json.ssub;
+    if (sub) {
+      Object.entries(sub).forEach(([name, val]) => {
+        localStorage.setItem(shiftKey('ssub', y, m) + '_' + name, val);
+      });
+    }
+  } catch (e) { /* オフライン時はローカル表示のまま */ }
+  // 表示中の月と一致していれば再描画
+  if (shiftManageMonth.y === y && shiftManageMonth.m === m) {
+    updateUnsubmittedBanner(y, m);
+    if (shiftManageTab === 'requests') renderManageReqTable(y, m);
   }
 }
 
