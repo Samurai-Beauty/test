@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      2.0.3
+// @version      2.0.4
 // @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
@@ -15,6 +15,7 @@
   'use strict';
 
   // ── 設定 ────────────────────────────────────────────────────────────────
+  var VERSION  = '2.0.4';
   var SB_URL   = 'https://ifiamddyhbbrseglqesg.supabase.co';
   var SB_KEY   = 'sb_publishable_nUMDcYGE4ZzkBQAiV0bvCQ_9t1bthno';
   var PLAN_KEY = 'samurai_sc_sync_v1';    // localStorage キー（SCドメイン内）
@@ -141,7 +142,7 @@
     }
     var pct = total > 0 ? Math.round(done / total * 100) : 0;
     _uiEl.innerHTML = [
-      '<div style="font-weight:800;font-size:14px;margin-bottom:8px">📅 サムライ SC同期</div>',
+      '<div style="font-weight:800;font-size:14px;margin-bottom:8px">📅 サムライ SC同期 v' + VERSION + '</div>',
       '<div style="margin-bottom:10px">' + escHtml(msg) + '</div>',
       total > 0 ? [
         '<div style="background:rgba(255,255,255,.18);border-radius:4px;height:6px;overflow:hidden">',
@@ -401,7 +402,38 @@
     }
   }
 
-  // タスク → ローカルプランへ変換して同期開始（確認ダイアログあり）
+  // 同期開始の確認パネル（DOMベース）
+  // ※ ネイティブ confirm() はブラウザ自動化ツールに自動キャンセルされてしまうため使わない。
+  //    画面上のボタンなら人間も自動化ツールもクリックできる。
+  function showConfirmPanel(plan) {
+    if (!_uiEl) showUI('', 0, 0);
+    var year  = String(plan.ym).slice(0, 4);
+    var mon   = parseInt(String(plan.ym).slice(4, 6), 10);
+    var names = Object.keys(STAFF_ACCOUNTS).join('、');
+    _uiEl.innerHTML = [
+      '<div style="font-weight:800;font-size:14px;margin-bottom:8px">📅 サムライ SC同期 v' + VERSION + '</div>',
+      '<div style="margin-bottom:8px"><b>' + year + '年' + mon + '月</b>のシフトを全アカウントに',
+      DRY_RUN ? '入力します（プレビュー・保存なし）。' : '自動入力・保存します。',
+      '</div>',
+      '<div style="font-size:11px;opacity:.85;margin-bottom:10px">対象(' + Object.keys(STAFF_ACCOUNTS).length + '名 / ' +
+        plan.accounts.length + 'アカウント): ' + escHtml(names) + '<br>※各スタッフの「その日の実働店舗」に対応するアカウントへ振り分けます。</div>',
+      '<button id="sc-confirm-start" style="padding:7px 18px;background:#4fc3f7;color:#06243a;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:800">▶ 同期を開始</button>',
+      '<button id="sc-confirm-cancel" style="margin-left:8px;padding:7px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:7px;cursor:pointer;font-size:12px">キャンセル</button>',
+    ].join('');
+    document.getElementById('sc-confirm-start').onclick = function() {
+      plan.confirmed = true;
+      setPlan(plan);
+      runNext();
+    };
+    document.getElementById('sc-confirm-cancel').onclick = function() {
+      setPlan(null);
+      if (!DRY_RUN) sbDelete(TASK_STORE_KEY);
+      showUI('⛔ 同期をキャンセルしました', 0, 0);
+      setTimeout(hideUI, 3000);
+    };
+  }
+
+  // タスク → ローカルプランへ変換して確認パネルを表示
   function startFromTask(task) {
     // タスクをローカルプランに変換（アカウント割り当ては userscript 側で解決）
     var accounts = buildAccounts();
@@ -410,34 +442,17 @@
       shiftData:     task.shiftData,
       accounts:      accounts,
       done:          [],
+      confirmed:     false,                   // 「▶ 同期を開始」が押されるまで実行しない
       taskCreatedAt: task.createdAt || null,  // 新旧タスクの判別用
     };
     setPlan(newPlan);
-
-    // 確認ダイアログ
-    var year = String(task.ym).slice(0, 4);
-    var mon  = parseInt(String(task.ym).slice(4, 6), 10);
-    var names = Object.keys(STAFF_ACCOUNTS).join('、');
-
-    if (!confirm(
-      (DRY_RUN ? '【サムライ SC同期：プレビュー（保存しません）】\n\n'
-               : '【サムライ SC自動同期】\n\n') +
-      year + '年' + mon + '月のシフトを全アカウントに' + (DRY_RUN ? '入力（保存なし）' : '自動入力・保存') + 'します。\n\n' +
-      '対象(' + Object.keys(STAFF_ACCOUNTS).length + '名 / ' + accounts.length + 'アカウント): ' + names + '\n\n' +
-      '※各スタッフの「その日の実働店舗」に対応するアカウントへ振り分けます。\n\n' +
-      (DRY_RUN ? 'アカウントごとに一時停止し、目視確認しながら進めます。よろしいですか？'
-               : '自動でフォームを入力・保存します。よろしいですか？')
-    )) {
-      setPlan(null);
-      if (!DRY_RUN) sbDelete(TASK_STORE_KEY);
-      return;
-    }
-
-    runNext();
+    console.log('[サムライSC同期] タスク検知: ' + task.ym + '（' + accounts.length + 'アカウント）確認待ち');
+    showConfirmPanel(newPlan);
   }
 
   // ── 起動処理 ─────────────────────────────────────────────────────────
   function onPageReady() {
+    console.log('[サムライSC同期] v' + VERSION + ' 起動（' + location.pathname + '）');
     var plan = getPlan();
 
     if (plan && plan.accounts) {
@@ -448,7 +463,9 @@
         var isNewTask = task && task.status === 'pending' &&
                         task.createdAt && task.createdAt !== plan.taskCreatedAt;
         if (isNewTask) {
-          startFromTask(task);  // 新しいタスク → プランを作り直して開始
+          startFromTask(task);  // 新しいタスク → プランを作り直して確認から
+        } else if (!plan.confirmed) {
+          showConfirmPanel(plan);  // 未確認のまま残ったプラン → 再度確認パネルを表示
         } else {
           showUI('同期を再開しています…', 0, plan.accounts.length);
           setTimeout(runNext, 1200);
