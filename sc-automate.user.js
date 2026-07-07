@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      2.0.7
+// @version      2.0.8
 // @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
@@ -15,7 +15,7 @@
   'use strict';
 
   // ── 設定 ────────────────────────────────────────────────────────────────
-  var VERSION  = '2.0.7';
+  var VERSION  = '2.0.8';
   var SB_URL   = 'https://ifiamddyhbbrseglqesg.supabase.co';
   var SB_KEY   = 'sb_publishable_nUMDcYGE4ZzkBQAiV0bvCQ_9t1bthno';
   var PLAN_KEY = 'samurai_sc_sync_v1';    // localStorage キー（SCドメイン内）
@@ -241,7 +241,17 @@
   function readYearMonthFromDom() {
     var direct = document.querySelector('[name="yearmonth"], #yearmonth');
     if (direct && direct.value) return String(direct.value).replace(/[^\d]/g, '').slice(0, 6);
-    var text = document.body ? document.body.innerText || '' : '';
+    var candidates = [
+      'h1', 'h2', 'h3',
+      '.page-title', '.contents-title', '.main-title', '.title',
+      '#contents h1', '#contents h2', '#main h1', '#main h2',
+      '[class*="title"]', '[id*="title"]',
+    ];
+    var text = candidates.map(function(sel) {
+      return Array.prototype.slice.call(document.querySelectorAll(sel)).map(function(el) {
+        return el.textContent || '';
+      }).join(' ');
+    }).join(' ');
     var m = text.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
     if (m) return m[1] + String(parseInt(m[2], 10)).padStart(2, '0');
     return '';
@@ -493,16 +503,19 @@
       var inSch  = (ssched[ds] || []).indexOf(staffName) >= 0;
       var tkey   = (stimes[ds] || {})[staffName];
       var pid    = null;
+      var isWork = false;
+      var shiftKey = tkey || 'full';
 
       if (inSch && tkey !== 'off') {
         // その日の実働店舗（振替があればその店、無ければ自店）
         var ovStore = (sstore[ds] || {})[staffName];
         var effShop = ovStore ? (STORE_SHOP[ovStore] || home) : home;
         if (effShop === store) {
-          pid = resolvePid(tkey || 'full', store);
+          isWork = true;
+          pid = resolvePid(shiftKey, store);
         }
       }
-      result.push({ dateStr: dateStr, status: pid ? 'work' : 'off', pid: pid, shiftKey: tkey || 'full' });
+      result.push({ dateStr: dateStr, status: isWork ? 'work' : 'off', pid: pid, shiftKey: shiftKey });
     }
     return result;
   }
@@ -526,7 +539,7 @@
       var ce = document.querySelector('[name="closed_'           + p.dateStr + '"]');
       var se = document.querySelector('[name="shift_id_'         + p.dateStr + '"]');
       if (!ce && !se) return;
-      if (p.status === 'work' && p.pid) {
+      if (p.status === 'work') {
         var dynamicPid = resolvePidFromSelect(se, p.shiftKey, p.pid);
         if (!dynamicPid) {
           console.warn('[SC同期] 勤務パターンを解決できないため、この日は書き換えません', p);
