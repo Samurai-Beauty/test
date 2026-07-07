@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      2.0.5
+// @version      2.0.6
 // @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
@@ -15,7 +15,7 @@
   'use strict';
 
   // ── 設定 ────────────────────────────────────────────────────────────────
-  var VERSION  = '2.0.5';
+  var VERSION  = '2.0.6';
   var SB_URL   = 'https://ifiamddyhbbrseglqesg.supabase.co';
   var SB_KEY   = 'sb_publishable_nUMDcYGE4ZzkBQAiV0bvCQ_9t1bthno';
   var PLAN_KEY = 'samurai_sc_sync_v1';    // localStorage キー（SCドメイン内）
@@ -212,7 +212,83 @@
     });
   }
 
-  function dumpDomSnapshot(label, scId, ym) {
+  function normText(s) {
+    return String(s || '').replace(/\s+/g, '').replace(/　/g, '').toLowerCase();
+  }
+
+  function findStaffSelect() {
+    var byName = document.querySelector('select[name="select_staff"]');
+    if (byName) return byName;
+    var candidates = findSelectByNameOrId('staff|select_staff');
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  function findStoreSelectForTarget(shopId) {
+    var candidates = findSelectByNameOrId('shop|store|salon|client');
+    if (candidates.length === 1) return candidates[0];
+    var targetLabel = normText(SHOP_LABEL[shopId] || shopId);
+    var matched = candidates.filter(function(sel) {
+      var info = selectedOptionInfo(sel);
+      return info && (
+        info.value === shopId ||
+        normText(info.text).indexOf(targetLabel) >= 0 ||
+        normText(info.text).indexOf(normText(shopId)) >= 0
+      );
+    });
+    return matched.length === 1 ? matched[0] : null;
+  }
+
+  function readYearMonthFromDom() {
+    var direct = document.querySelector('[name="yearmonth"], #yearmonth');
+    if (direct && direct.value) return String(direct.value).replace(/[^\d]/g, '').slice(0, 6);
+    var text = document.body ? document.body.innerText || '' : '';
+    var m = text.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
+    if (m) return m[1] + String(parseInt(m[2], 10)).padStart(2, '0');
+    return '';
+  }
+
+  function verifyDomIdentity(scId, shopId, ym) {
+    var issues = [];
+    var staffSelect = findStaffSelect();
+    var storeSelect = findStoreSelectForTarget(shopId);
+    var staffInfo = selectedOptionInfo(staffSelect);
+    var storeInfo = selectedOptionInfo(storeSelect);
+    var domYm = readYearMonthFromDom();
+
+    if (!staffInfo) {
+      issues.push('スタッフ選択selectを一意に特定できません');
+    } else if (String(staffInfo.value) !== String(scId)) {
+      issues.push('スタッフ不一致: selected=' + staffInfo.value + ' / target=' + scId + '（' + staffInfo.text + '）');
+    }
+
+    if (!storeInfo) {
+      issues.push('店舗選択selectを一意に特定できません');
+    } else {
+      var targetLabel = normText(SHOP_LABEL[shopId] || shopId);
+      var storeOk = String(storeInfo.value) === String(shopId) ||
+        normText(storeInfo.text).indexOf(targetLabel) >= 0 ||
+        normText(storeInfo.text).indexOf(normText(shopId)) >= 0;
+      if (!storeOk) {
+        issues.push('店舗不一致: selected=' + storeInfo.value + ' / target=' + shopId + '（' + storeInfo.text + '）');
+      }
+    }
+
+    if (!domYm) {
+      issues.push('年月をDOMから特定できません');
+    } else if (String(domYm) !== String(ym)) {
+      issues.push('年月不一致: selected=' + domYm + ' / target=' + ym);
+    }
+
+    return {
+      ok: issues.length === 0,
+      issues: issues,
+      staff: staffInfo,
+      store: storeInfo,
+      ym: domYm,
+    };
+  }
+
+  function dumpDomSnapshot(label, scId, shopId, ym) {
     if (!DUMP_DOM_ON_DRY_RUN) return;
     var selects = Array.prototype.slice.call(document.querySelectorAll('select'));
     var forms = Array.prototype.slice.call(document.querySelectorAll('form'));
@@ -256,7 +332,8 @@
       });
 
     console.group('[SC同期 DOM調査] ' + label);
-    console.log('target', { scId: scId, ym: ym });
+    console.log('target', { scId: scId, shopId: shopId, ym: ym });
+    console.log('identity', verifyDomIdentity(scId, shopId, ym));
     console.log('location', {
       href: location.href,
       pathname: location.pathname,
@@ -459,6 +536,14 @@
     var onShiftPage = location.pathname.indexOf('staff_day_shift') >= 0;
 
     if (onShiftPage && curStaff === scId && curYm === ym) {
+      var identity = verifyDomIdentity(scId, store, ym);
+      if (!identity.ok) {
+        console.error('[SC同期] identity guard failed', identity);
+        dumpDomSnapshot(label, scId, store, ym);
+        showUI('⚠️ ' + label + ': 表示中の店舗/スタッフ/年月を確認できないため停止しました。<br>' + escHtml(identity.issues.join(' / ')), done, total);
+        return;
+      }
+
       // 正しいアカウントのページにいる → 入力
       var year = parseInt(ym.slice(0, 4), 10);
       var mon  = parseInt(ym.slice(4, 6), 10);
@@ -467,7 +552,7 @@
 
       // ── 事前テスト（プレビュー）：フォーム値を変更せずDOMと入力予定を確認 ──
       if (DRY_RUN) {
-        dumpDomSnapshot(label, scId, ym);
+        dumpDomSnapshot(label, scId, store, ym);
         var workN = dayPlan.filter(function(p){ return p.status === 'work'; }).length;
         showPreview(label, workN, remaining.length, done, total, function() {
           plan.done.push(scId);
