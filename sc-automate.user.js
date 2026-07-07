@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      2.0.6
+// @version      2.0.7
 // @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
@@ -15,7 +15,7 @@
   'use strict';
 
   // ── 設定 ────────────────────────────────────────────────────────────────
-  var VERSION  = '2.0.6';
+  var VERSION  = '2.0.7';
   var SB_URL   = 'https://ifiamddyhbbrseglqesg.supabase.co';
   var SB_KEY   = 'sb_publishable_nUMDcYGE4ZzkBQAiV0bvCQ_9t1bthno';
   var PLAN_KEY = 'samurai_sc_sync_v1';    // localStorage キー（SCドメイン内）
@@ -402,6 +402,81 @@
     return v !== undefined ? v : null;
   }
 
+  function normalizeTimeLabel(s) {
+    return String(s || '')
+      .replace(/[〜～]/g, '~')
+      .replace(/[－ー−–—]/g, '-')
+      .replace(/\s+/g, '')
+      .replace(/営業終了時間/g, '22:00');
+  }
+
+  function parseHourMinute(part) {
+    var m = String(part || '').match(/(\d{1,2})(?::?(\d{2}))?/);
+    if (!m) return null;
+    var h = parseInt(m[1], 10);
+    var min = m[2] ? parseInt(m[2], 10) : 0;
+    if (isNaN(h) || isNaN(min) || h < 0 || h > 30 || min < 0 || min > 59) return null;
+    return h * 60 + min;
+  }
+
+  function parseTimeRange(label) {
+    var s = normalizeTimeLabel(label);
+    var m = s.match(/(\d{1,2}(?::?\d{2})?)[~-](\d{1,2}(?::?\d{2})?)/);
+    if (!m) return null;
+    var start = parseHourMinute(m[1]);
+    var end = parseHourMinute(m[2]);
+    if (start === null || end === null) return null;
+    return { start: start, end: end };
+  }
+
+  function rangeForShiftKey(key) {
+    if (!key || key === 'off') return null;
+    if (key.indexOf('custom:') === 0) return parseTimeRange(key.slice(7));
+    var ranges = {
+      'h11-22': { start: 11 * 60, end: 22 * 60 },
+      'h11-17': { start: 11 * 60, end: 17 * 60 },
+      'early':  { start: 13 * 60, end: 18 * 60 },
+      'late':   { start: 16 * 60, end: 22 * 60 },
+      'full':   { start: 13 * 60, end: 22 * 60 },
+      'omakase':{ start: 13 * 60, end: 22 * 60 },
+    };
+    return ranges[key] || null;
+  }
+
+  function sameRange(a, b) {
+    return !!a && !!b && a.start === b.start && a.end === b.end;
+  }
+
+  function resolvePidFromSelect(selectEl, shiftKey, fallbackPid) {
+    var target = rangeForShiftKey(shiftKey);
+    if (!selectEl || !selectEl.options || !target) return null;
+    var hits = [];
+    Array.prototype.slice.call(selectEl.options).forEach(function(opt) {
+      var label = (opt.textContent || opt.label || '').trim();
+      var value = opt.value || '';
+      if (!value) return;
+      var range = parseTimeRange(label);
+      if (sameRange(range, target)) hits.push({ value: value, label: label });
+    });
+    if (hits.length === 1) return hits[0].value;
+    if (hits.length > 1) {
+      console.warn('[SC同期] 勤務パターン候補が複数あるため書き換えません', {
+        shiftKey: shiftKey,
+        target: target,
+        hits: hits,
+        fallbackPid: fallbackPid,
+      });
+      return null;
+    }
+    console.warn('[SC同期] 勤務パターンラベルが見つからないため書き換えません', {
+      shiftKey: shiftKey,
+      target: target,
+      fallbackPid: fallbackPid,
+      options: optionRows(selectEl),
+    });
+    return null;
+  }
+
   // store = このアカウントの店舗。その日の実働店舗が store と一致する日だけ「出勤」、
   // それ以外は必ず「休み」。全日を明示的に上書きするのでゴミ（出1 等）が残らない。
   function calcPlan(staffName, year, mon, shiftData, store) {
@@ -427,7 +502,7 @@
           pid = resolvePid(tkey || 'full', store);
         }
       }
-      result.push({ dateStr: dateStr, status: pid ? 'work' : 'off', pid: pid });
+      result.push({ dateStr: dateStr, status: pid ? 'work' : 'off', pid: pid, shiftKey: tkey || 'full' });
     }
     return result;
   }
@@ -450,13 +525,19 @@
       if (p.status === 'skip') return;
       var ce = document.querySelector('[name="closed_'           + p.dateStr + '"]');
       var se = document.querySelector('[name="shift_id_'         + p.dateStr + '"]');
-      var be = document.querySelector('[name="before_shiftid_'   + p.dateStr + '"]');
       if (!ce && !se) return;
       if (p.status === 'work' && p.pid) {
-        setVal(ce, '0'); setVal(se, p.pid); if (be) setVal(be, p.pid);
+        var dynamicPid = resolvePidFromSelect(se, p.shiftKey, p.pid);
+        if (!dynamicPid) {
+          console.warn('[SC同期] 勤務パターンを解決できないため、この日は書き換えません', p);
+          return;
+        } else {
+          setVal(ce, '0');
+          setVal(se, dynamicPid);
+        }
       } else {
         // off、または有効なパターンIDが取れなかった work → 休みとして確定（誤ID防止）
-        setVal(ce, '1'); setVal(se, ''); if (be) setVal(be, '');
+        setVal(ce, '1'); setVal(se, '');
       }
       n++;
     });
