@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         サムライ → Salon Connect シフト自動同期
 // @namespace    https://samurai-beauty.github.io/test/
-// @version      2.0.4
+// @version      2.0.8
 // @description  サムライのシフトをSalon Connectへ自動入力。各スタッフの店舗別アカウントに、その日の実働店舗で振り分け（多店舗アカウント・店舗別パターンID対応）
 // @author       Samurai Beauty
 // @match        https://sc.salonconnect.jp/*
@@ -15,7 +15,7 @@
   'use strict';
 
   // ── 設定 ────────────────────────────────────────────────────────────────
-  var VERSION  = '2.0.4';
+  var VERSION  = '2.0.8';
   var SB_URL   = 'https://ifiamddyhbbrseglqesg.supabase.co';
   var SB_KEY   = 'sb_publishable_nUMDcYGE4ZzkBQAiV0bvCQ_9t1bthno';
   var PLAN_KEY = 'samurai_sc_sync_v1';    // localStorage キー（SCドメイン内）
@@ -23,9 +23,10 @@
   var POLL_MS  = 4000;   // タスク確認間隔（ms）
   var SAVE_WAIT_MS = 2500; // 保存後の待機時間
 
-  // 事前テスト用：true にすると「保存せず」フォームに入力結果を表示するだけ（プレビュー）。
-  // 各スタッフごとに一時停止し、カレンダーを目視確認 → [次へ] で進む。本番では false に戻す。
+  // 事前テスト用：true にすると「保存せず」入力予定だけを表示する（フォーム値も変更しない）。
+  // 各スタッフごとに一時停止し、コンソール出力を確認 → [次へ] で進む。本番では false に戻す。
   var DRY_RUN = false;
+  var DUMP_DOM_ON_DRY_RUN = true;
 
   // サムライ名 → 店舗別 Salon Connect アカウントID（2026年7月確認済み）
   // ※ 各スタッフは「勤務する店舗ごとに別アカウント」を持つ。
@@ -179,11 +180,214 @@
     if (console.table) console.table(rows); else console.log(rows);
   }
 
+  function selectedOptionInfo(selectEl) {
+    if (!selectEl) return null;
+    var opt = selectEl.options && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+    return {
+      selector: selectEl.tagName.toLowerCase() + (selectEl.id ? '#' + selectEl.id : '') + (selectEl.name ? '[name="' + selectEl.name + '"]' : ''),
+      name: selectEl.name || '',
+      id: selectEl.id || '',
+      value: selectEl.value || '',
+      text: opt ? (opt.textContent || '').trim() : '',
+    };
+  }
+
+  function optionRows(selectEl) {
+    if (!selectEl || !selectEl.options) return [];
+    return Array.prototype.slice.call(selectEl.options).map(function(opt, idx) {
+      return {
+        index: idx,
+        value: opt.value || '',
+        text: (opt.textContent || '').trim(),
+        selected: !!opt.selected,
+      };
+    });
+  }
+
+  function findSelectByNameOrId(pattern) {
+    var re = new RegExp(pattern, 'i');
+    var selects = Array.prototype.slice.call(document.querySelectorAll('select'));
+    return selects.filter(function(el) {
+      return re.test(el.name || '') || re.test(el.id || '') || re.test(el.className || '');
+    });
+  }
+
+  function normText(s) {
+    return String(s || '').replace(/\s+/g, '').replace(/　/g, '').toLowerCase();
+  }
+
+  function findStaffSelect() {
+    var byName = document.querySelector('select[name="select_staff"]');
+    if (byName) return byName;
+    var candidates = findSelectByNameOrId('staff|select_staff');
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  function findStoreSelectForTarget(shopId) {
+    var candidates = findSelectByNameOrId('shop|store|salon|client');
+    if (candidates.length === 1) return candidates[0];
+    var targetLabel = normText(SHOP_LABEL[shopId] || shopId);
+    var matched = candidates.filter(function(sel) {
+      var info = selectedOptionInfo(sel);
+      return info && (
+        info.value === shopId ||
+        normText(info.text).indexOf(targetLabel) >= 0 ||
+        normText(info.text).indexOf(normText(shopId)) >= 0
+      );
+    });
+    return matched.length === 1 ? matched[0] : null;
+  }
+
+  function readYearMonthFromDom() {
+    var direct = document.querySelector('[name="yearmonth"], #yearmonth');
+    if (direct && direct.value) return String(direct.value).replace(/[^\d]/g, '').slice(0, 6);
+    var candidates = [
+      'h1', 'h2', 'h3',
+      '.page-title', '.contents-title', '.main-title', '.title',
+      '#contents h1', '#contents h2', '#main h1', '#main h2',
+      '[class*="title"]', '[id*="title"]',
+    ];
+    var text = candidates.map(function(sel) {
+      return Array.prototype.slice.call(document.querySelectorAll(sel)).map(function(el) {
+        return el.textContent || '';
+      }).join(' ');
+    }).join(' ');
+    var m = text.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
+    if (m) return m[1] + String(parseInt(m[2], 10)).padStart(2, '0');
+    return '';
+  }
+
+  function verifyDomIdentity(scId, shopId, ym) {
+    var issues = [];
+    var staffSelect = findStaffSelect();
+    var storeSelect = findStoreSelectForTarget(shopId);
+    var staffInfo = selectedOptionInfo(staffSelect);
+    var storeInfo = selectedOptionInfo(storeSelect);
+    var domYm = readYearMonthFromDom();
+
+    if (!staffInfo) {
+      issues.push('スタッフ選択selectを一意に特定できません');
+    } else if (String(staffInfo.value) !== String(scId)) {
+      issues.push('スタッフ不一致: selected=' + staffInfo.value + ' / target=' + scId + '（' + staffInfo.text + '）');
+    }
+
+    if (!storeInfo) {
+      issues.push('店舗選択selectを一意に特定できません');
+    } else {
+      var targetLabel = normText(SHOP_LABEL[shopId] || shopId);
+      var storeOk = String(storeInfo.value) === String(shopId) ||
+        normText(storeInfo.text).indexOf(targetLabel) >= 0 ||
+        normText(storeInfo.text).indexOf(normText(shopId)) >= 0;
+      if (!storeOk) {
+        issues.push('店舗不一致: selected=' + storeInfo.value + ' / target=' + shopId + '（' + storeInfo.text + '）');
+      }
+    }
+
+    if (!domYm) {
+      issues.push('年月をDOMから特定できません');
+    } else if (String(domYm) !== String(ym)) {
+      issues.push('年月不一致: selected=' + domYm + ' / target=' + ym);
+    }
+
+    return {
+      ok: issues.length === 0,
+      issues: issues,
+      staff: staffInfo,
+      store: storeInfo,
+      ym: domYm,
+    };
+  }
+
+  function dumpDomSnapshot(label, scId, shopId, ym) {
+    if (!DUMP_DOM_ON_DRY_RUN) return;
+    var selects = Array.prototype.slice.call(document.querySelectorAll('select'));
+    var forms = Array.prototype.slice.call(document.querySelectorAll('form'));
+    var submitCandidates = Array.prototype.slice.call(document.querySelectorAll(
+      'input[type="submit"], button[type="submit"], button[onclick], input[type="button"]'
+    )).map(function(el, idx) {
+      return {
+        index: idx,
+        tag: el.tagName,
+        type: el.getAttribute('type') || '',
+        id: el.id || '',
+        name: el.name || '',
+        value: el.value || '',
+        text: (el.textContent || '').trim(),
+        onclick: el.getAttribute('onclick') || '',
+      };
+    });
+    var fieldSamples = Array.prototype.slice.call(document.querySelectorAll(
+      '[name^="closed_"], [name^="shift_id_"], [name^="before_shiftid_"]'
+    )).slice(0, 30).map(function(el) {
+      return {
+        name: el.name || '',
+        tag: el.tagName,
+        type: el.getAttribute('type') || '',
+        value: el.value || '',
+        checked: !!el.checked,
+      };
+    });
+    var suspectedStaff = findSelectByNameOrId('staff|select_staff');
+    var suspectedStore = findSelectByNameOrId('shop|store|salon|client');
+    var suspectedYm = Array.prototype.slice.call(document.querySelectorAll('[name*="year"], [id*="year"], [name*="month"], [id*="month"]'))
+      .slice(0, 20).map(function(el) {
+        return {
+          tag: el.tagName,
+          id: el.id || '',
+          name: el.name || '',
+          type: el.getAttribute('type') || '',
+          value: el.value || '',
+          text: (el.textContent || '').trim().slice(0, 80),
+        };
+      });
+
+    console.group('[SC同期 DOM調査] ' + label);
+    console.log('target', { scId: scId, shopId: shopId, ym: ym });
+    console.log('identity', verifyDomIdentity(scId, shopId, ym));
+    console.log('location', {
+      href: location.href,
+      pathname: location.pathname,
+      search: location.search,
+      title: document.title,
+    });
+    console.log('selected staff candidates', suspectedStaff.map(selectedOptionInfo));
+    suspectedStaff.forEach(function(el, idx) {
+      console.log('staff select options #' + idx, selectedOptionInfo(el));
+      if (console.table) console.table(optionRows(el));
+      else console.log(optionRows(el));
+    });
+    console.log('selected store candidates', suspectedStore.map(selectedOptionInfo));
+    suspectedStore.forEach(function(el, idx) {
+      console.log('store select options #' + idx, selectedOptionInfo(el));
+      if (console.table) console.table(optionRows(el));
+      else console.log(optionRows(el));
+    });
+    console.log('all selects', selects.map(function(el, idx) {
+      var info = selectedOptionInfo(el) || {};
+      info.index = idx;
+      info.optionCount = el.options ? el.options.length : 0;
+      return info;
+    }));
+    if (console.table) console.table(suspectedYm); else console.log(suspectedYm);
+    console.log('forms', forms.map(function(form, idx) {
+      return {
+        index: idx,
+        id: form.id || '',
+        name: form.name || '',
+        method: form.method || '',
+        action: form.action || '',
+      };
+    }));
+    if (console.table) console.table(submitCandidates); else console.log(submitCandidates);
+    if (console.table) console.table(fieldSamples); else console.log(fieldSamples);
+    console.groupEnd();
+  }
+
   function showPreview(name, workN, remaining, done, total, onNext) {
     if (!_uiEl) showUI('', done, total);
     _uiEl.innerHTML = [
       '<div style="font-weight:800;font-size:14px;margin-bottom:8px">👀 プレビュー（保存しません）</div>',
-      '<div style="margin-bottom:8px"><b>' + escHtml(name) + '</b>：出勤 ' + workN + '日を入力しました。<br>カレンダーを目視確認してください。</div>',
+      '<div style="margin-bottom:8px"><b>' + escHtml(name) + '</b>：出勤予定 ' + workN + '日です。<br>DRY_RUNのためフォーム値は変更していません。コンソールのDOM調査ログを確認してください。</div>',
       '<div style="font-size:11px;opacity:.75;margin-bottom:10px">進捗 ' + done + ' / ' + total + '名（残り' + remaining + '名）</div>',
       '<button id="sc-prev-next" style="padding:6px 16px;background:#4fc3f7;color:#06243a;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:800">次のスタッフへ ▶</button>',
       '<button id="sc-prev-stop" style="margin-left:8px;padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:7px;cursor:pointer;font-size:12px">■ 終了</button>',
@@ -208,6 +412,81 @@
     return v !== undefined ? v : null;
   }
 
+  function normalizeTimeLabel(s) {
+    return String(s || '')
+      .replace(/[〜～]/g, '~')
+      .replace(/[－ー−–—]/g, '-')
+      .replace(/\s+/g, '')
+      .replace(/営業終了時間/g, '22:00');
+  }
+
+  function parseHourMinute(part) {
+    var m = String(part || '').match(/(\d{1,2})(?::?(\d{2}))?/);
+    if (!m) return null;
+    var h = parseInt(m[1], 10);
+    var min = m[2] ? parseInt(m[2], 10) : 0;
+    if (isNaN(h) || isNaN(min) || h < 0 || h > 30 || min < 0 || min > 59) return null;
+    return h * 60 + min;
+  }
+
+  function parseTimeRange(label) {
+    var s = normalizeTimeLabel(label);
+    var m = s.match(/(\d{1,2}(?::?\d{2})?)[~-](\d{1,2}(?::?\d{2})?)/);
+    if (!m) return null;
+    var start = parseHourMinute(m[1]);
+    var end = parseHourMinute(m[2]);
+    if (start === null || end === null) return null;
+    return { start: start, end: end };
+  }
+
+  function rangeForShiftKey(key) {
+    if (!key || key === 'off') return null;
+    if (key.indexOf('custom:') === 0) return parseTimeRange(key.slice(7));
+    var ranges = {
+      'h11-22': { start: 11 * 60, end: 22 * 60 },
+      'h11-17': { start: 11 * 60, end: 17 * 60 },
+      'early':  { start: 13 * 60, end: 18 * 60 },
+      'late':   { start: 16 * 60, end: 22 * 60 },
+      'full':   { start: 13 * 60, end: 22 * 60 },
+      'omakase':{ start: 13 * 60, end: 22 * 60 },
+    };
+    return ranges[key] || null;
+  }
+
+  function sameRange(a, b) {
+    return !!a && !!b && a.start === b.start && a.end === b.end;
+  }
+
+  function resolvePidFromSelect(selectEl, shiftKey, fallbackPid) {
+    var target = rangeForShiftKey(shiftKey);
+    if (!selectEl || !selectEl.options || !target) return null;
+    var hits = [];
+    Array.prototype.slice.call(selectEl.options).forEach(function(opt) {
+      var label = (opt.textContent || opt.label || '').trim();
+      var value = opt.value || '';
+      if (!value) return;
+      var range = parseTimeRange(label);
+      if (sameRange(range, target)) hits.push({ value: value, label: label });
+    });
+    if (hits.length === 1) return hits[0].value;
+    if (hits.length > 1) {
+      console.warn('[SC同期] 勤務パターン候補が複数あるため書き換えません', {
+        shiftKey: shiftKey,
+        target: target,
+        hits: hits,
+        fallbackPid: fallbackPid,
+      });
+      return null;
+    }
+    console.warn('[SC同期] 勤務パターンラベルが見つからないため書き換えません', {
+      shiftKey: shiftKey,
+      target: target,
+      fallbackPid: fallbackPid,
+      options: optionRows(selectEl),
+    });
+    return null;
+  }
+
   // store = このアカウントの店舗。その日の実働店舗が store と一致する日だけ「出勤」、
   // それ以外は必ず「休み」。全日を明示的に上書きするのでゴミ（出1 等）が残らない。
   function calcPlan(staffName, year, mon, shiftData, store) {
@@ -224,16 +503,19 @@
       var inSch  = (ssched[ds] || []).indexOf(staffName) >= 0;
       var tkey   = (stimes[ds] || {})[staffName];
       var pid    = null;
+      var isWork = false;
+      var shiftKey = tkey || 'full';
 
       if (inSch && tkey !== 'off') {
         // その日の実働店舗（振替があればその店、無ければ自店）
         var ovStore = (sstore[ds] || {})[staffName];
         var effShop = ovStore ? (STORE_SHOP[ovStore] || home) : home;
         if (effShop === store) {
-          pid = resolvePid(tkey || 'full', store);
+          isWork = true;
+          pid = resolvePid(shiftKey, store);
         }
       }
-      result.push({ dateStr: dateStr, status: pid ? 'work' : 'off', pid: pid });
+      result.push({ dateStr: dateStr, status: isWork ? 'work' : 'off', pid: pid, shiftKey: shiftKey });
     }
     return result;
   }
@@ -256,13 +538,19 @@
       if (p.status === 'skip') return;
       var ce = document.querySelector('[name="closed_'           + p.dateStr + '"]');
       var se = document.querySelector('[name="shift_id_'         + p.dateStr + '"]');
-      var be = document.querySelector('[name="before_shiftid_'   + p.dateStr + '"]');
       if (!ce && !se) return;
-      if (p.status === 'work' && p.pid) {
-        setVal(ce, '0'); setVal(se, p.pid); if (be) setVal(be, p.pid);
+      if (p.status === 'work') {
+        var dynamicPid = resolvePidFromSelect(se, p.shiftKey, p.pid);
+        if (!dynamicPid) {
+          console.warn('[SC同期] 勤務パターンを解決できないため、この日は書き換えません', p);
+          return;
+        } else {
+          setVal(ce, '0');
+          setVal(se, dynamicPid);
+        }
       } else {
         // off、または有効なパターンIDが取れなかった work → 休みとして確定（誤ID防止）
-        setVal(ce, '1'); setVal(se, ''); if (be) setVal(be, '');
+        setVal(ce, '1'); setVal(se, '');
       }
       n++;
     });
@@ -342,15 +630,23 @@
     var onShiftPage = location.pathname.indexOf('staff_day_shift') >= 0;
 
     if (onShiftPage && curStaff === scId && curYm === ym) {
+      var identity = verifyDomIdentity(scId, store, ym);
+      if (!identity.ok) {
+        console.error('[SC同期] identity guard failed', identity);
+        dumpDomSnapshot(label, scId, store, ym);
+        showUI('⚠️ ' + label + ': 表示中の店舗/スタッフ/年月を確認できないため停止しました。<br>' + escHtml(identity.issues.join(' / ')), done, total);
+        return;
+      }
+
       // 正しいアカウントのページにいる → 入力
       var year = parseInt(ym.slice(0, 4), 10);
       var mon  = parseInt(ym.slice(4, 6), 10);
       var dayPlan = calcPlan(name, year, mon, plan.shiftData, store);
-      var filled  = fillForm(dayPlan);
       logPlan(label, store, dayPlan);
 
-      // ── 事前テスト（プレビュー）：保存せず目視確認 ──
+      // ── 事前テスト（プレビュー）：フォーム値を変更せずDOMと入力予定を確認 ──
       if (DRY_RUN) {
+        dumpDomSnapshot(label, scId, store, ym);
         var workN = dayPlan.filter(function(p){ return p.status === 'work'; }).length;
         showPreview(label, workN, remaining.length, done, total, function() {
           plan.done.push(scId);
@@ -360,6 +656,7 @@
         return;
       }
 
+      var filled  = fillForm(dayPlan);
       showUI(label + ': ' + filled + '日設定、保存中…', done, total);
 
       setTimeout(function() {
