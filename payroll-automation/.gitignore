@@ -1,0 +1,14 @@
+# 認証情報(コミット禁止)
+.env
+
+# 実行結果(給与情報を含むためコミット禁止)
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/

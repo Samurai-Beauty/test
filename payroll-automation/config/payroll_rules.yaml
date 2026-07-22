@@ -1,0 +1,29 @@
+# 給与計算ルール定義(設計書 4.1)
+# TBD項目は確定後にこのファイルのみ変更する(コード変更不要)
+
+period:
+  closing_day: 99        # TBD-2: 締め日(99=月末)
+  payment_day: 99        # TBD-2: 支払日
+
+timezone: Asia/Tokyo
+
+rounding:
+  unit_minutes: 1        # TBD-3: 丸め単位(1分推奨。労働者不利の切り捨ては違法リスク)
+  method: none           # none | up(労働者有利方向のみ許可)
+
+workweek:
+  start_day: MON         # SquareのworkweekConfigsと整合させる(TBD-4)
+
+legal_holiday:
+  mode: weekly_one       # 週1日の法定休日
+  day: SUN               # TBD-5: 法定休日の曜日 or シフト起点で判定
+
+premium_rates:
+  overtime: 1.25          # 時間外(日8h超 or 週40h超)
+  overtime_over_60h: 1.50 # 月60時間超の時間外(中小企業も2023年4月から適用)
+  late_night: 0.25        # 深夜割増(22:00-05:00)※加算分
+  legal_holiday: 1.35     # 法定休日
+
+night_hours:
+  start: "22:00"
+  end: "05:00"
