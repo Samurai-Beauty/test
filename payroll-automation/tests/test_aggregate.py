@@ -4,10 +4,8 @@ fixtureはすべてダミーデータ。基準週: 2026-07-06(月)〜2026-07-12(
 既定ルール: 月末締め / 週起算MON / 法定休日SUN / 深夜22:00-05:00 / 丸めなし。
 """
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, time, timedelta
 from pathlib import Path
-
-import pytest
 
 from payroll.aggregate import (
     DAILY_LEGAL_MINUTES,
@@ -23,60 +21,15 @@ from payroll.aggregate import (
     split_daily_overtime,
     week_start_of,
 )
-from payroll.models import Break, Timecard, parse_timecard
+from payroll.models import parse_timecard
 from payroll.rules import load_rules
-from payroll.timeutil import JST
+
+from tests.helpers import MON, SUN, jst, tc
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 RULES = load_rules(CONFIG_DIR / "payroll_rules.yaml")
 
-MON = date(2026, 7, 6)  # 月曜
-SUN = date(2026, 7, 12)  # 日曜(既定ルールの法定休日)
 assert MON.weekday() == 0 and SUN.weekday() == 6
-
-
-def jst(day: date, hhmm: str, plus_days: int = 0) -> datetime:
-    hh, mm = map(int, hhmm.split(":"))
-    return datetime.combine(day + timedelta(days=plus_days), time(hh, mm), tzinfo=JST)
-
-
-_seq = iter(range(10_000))
-
-
-def tc(
-    member: str,
-    day: date,
-    start: str,
-    end: str | None,
-    breaks: list = (),
-    end_plus_days: int = 0,
-    location: str = "LFAKE001",
-    status: str | None = None,
-) -> Timecard:
-    """テスト用タイムカード。breaks要素: (開始, 終了[, 開始+日, 終了+日, is_paid])。"""
-    parsed_breaks = []
-    for spec in breaks:
-        b_start, b_end = spec[0], spec[1]
-        sd = spec[2] if len(spec) > 2 else 0
-        ed = spec[3] if len(spec) > 3 else sd
-        is_paid = spec[4] if len(spec) > 4 else False
-        parsed_breaks.append(
-            Break(
-                start_at=jst(day, b_start, sd),
-                end_at=jst(day, b_end, ed) if b_end else None,
-                is_paid=is_paid,
-            )
-        )
-    end_at = jst(day, end, end_plus_days) if end else None
-    return Timecard(
-        id=f"TC{next(_seq)}",
-        team_member_id=member,
-        location_id=location,
-        start_at=jst(day, start),
-        end_at=end_at,
-        breaks=parsed_breaks,
-        status=status or ("CLOSED" if end_at else "OPEN"),
-    )
 
 
 def summary_of(result, member: str):

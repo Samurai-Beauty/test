@@ -1,0 +1,25 @@
+{
+  "team_members": [
+    {
+      "id": "TM_A",
+      "family_name": "試験",
+      "given_name": "太郎",
+      "reference_id": "EMP001",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "TM_B",
+      "family_name": "試験",
+      "given_name": "花子",
+      "reference_id": "EMP002",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "TM_C",
+      "family_name": "試験",
+      "given_name": "三郎",
+      "reference_id": "EMP003",
+      "status": "ACTIVE"
+    }
+  ]
+}

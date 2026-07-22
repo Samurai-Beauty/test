@@ -1,0 +1,29 @@
+{
+  "timecards": [
+    {
+      "id": "TC_FIX_1",
+      "team_member_id": "TM_A",
+      "location_id": "LFAKE001",
+      "start_at": "2026-07-06T00:00:00Z",
+      "end_at": "2026-07-06T09:00:00Z",
+      "status": "CLOSED",
+      "breaks": [
+        {
+          "id": "BR_FIX_1",
+          "start_at": "2026-07-06T03:00:00Z",
+          "end_at": "2026-07-06T04:00:00Z",
+          "is_paid": false
+        }
+      ]
+    },
+    {
+      "id": "TC_FIX_2",
+      "team_member_id": "TM_B",
+      "location_id": "LFAKE001",
+      "start_at": "2026-07-06T04:00:00Z",
+      "end_at": "2026-07-06T13:30:00Z",
+      "status": "CLOSED",
+      "breaks": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "team_member_wages": [
+    {
+      "id": "WAGE_1",
+      "team_member_id": "TM_A",
+      "title": "スタイリスト",
+      "hourly_rate": { "amount": 1200, "currency": "JPY" }
+    },
+    {
+      "id": "WAGE_2",
+      "team_member_id": "TM_B",
+      "title": "スタイリスト",
+      "hourly_rate": { "amount": 1300, "currency": "JPY" }
+    },
+    {
+      "id": "WAGE_3",
+      "team_member_id": "TM_C",
+      "title": "アシスタント",
+      "hourly_rate": { "amount": 1000, "currency": "JPY" }
+    }
+  ]
+}

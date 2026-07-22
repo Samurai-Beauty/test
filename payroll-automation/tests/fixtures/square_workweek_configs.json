@@ -1,0 +1,9 @@
+{
+  "workweek_configs": [
+    {
+      "id": "WW_1",
+      "start_of_week": "MON",
+      "start_of_day_local_time": "00:00"
+    }
+  ]
+}
