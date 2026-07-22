@@ -124,7 +124,11 @@ def build_summary_md(
         lines.append("対象期間に集計対象の勤務がありません。")
 
     lines.append("")
-    lines.append("凡例: 時間外=割増1.25 / 月60h超=1.50 / 深夜=+0.25 / 休日=1.35(休日×深夜=1.60)")
+    lines.append(
+        f"凡例: 時間外=割増{rules.premium_overtime} / 月60h超={rules.premium_overtime_over_60h} / "
+        f"深夜=+{rules.premium_late_night} / 休日={rules.premium_legal_holiday}"
+        f"(休日×深夜={rules.premium_legal_holiday + rules.premium_late_night})"
+    )
     lines.append("")
     lines.append("承認ゲート①: 本表と errors.md を確認・承認後に `payroll export-mf` を実行してください。")
     return "\n".join(lines) + "\n"

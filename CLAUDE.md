@@ -2,6 +2,13 @@
 
 ## 未完成・保留中の機能
 
+### 給与計算自動化システム（`payroll-automation/`）
+- ブランチ: `claude/payroll-system-design-build-zdy2sp`
+- 内容: Square勤怠 → 集計（残業・深夜・休日・月60h超）→ 承認 → MF給与インポートCSV → 検算 のPython CLI
+- 設計書・構築書: `payroll-automation/docs/`、運用手順: `payroll-automation/README.md`
+- TBD-1〜6（締め日・丸め・MF列仕様・法定休日など）は `payroll-automation/config/` に外部化済み。確定したらconfigのみ修正
+- 実データ疎通には読み取り専用Squareトークン（TIMECARDS_READ / EMPLOYEES_READ）を `.env` に設定
+
 ### GBP クチコミ自動返信ボット（PR #1）
 - ブランチ: `claude/show-reply-bot-code-qrmb2`
 - ファイル: `reply_bot.py`
