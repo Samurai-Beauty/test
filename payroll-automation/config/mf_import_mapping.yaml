@@ -1,0 +1,30 @@
+# MF給与インポートCSV 列マッピング(仮仕様)
+# TBD-1: MF給与画面からインポートテンプレートを取得したら、このファイルだけを
+#        実テンプレートに合わせて修正する(コード変更不要)。
+#
+# encoding:    CSVの文字コード(utf-8-sig | cp932)。MF給与がShift_JIS要求ならcp932へ。
+# time_format: 時間列の出力形式(hhmm = "08:30" | decimal = "8.5")。列ごとに format で上書き可。
+# columns:     この並び順どおりにCSV列が出力される。
+#   source に指定できる値:
+#     employee_code / name / regular / overtime / overtime_over60 / night / holiday
+#     / total / days_worked
+
+encoding: utf-8-sig
+time_format: hhmm
+decimal_places: 2
+
+columns:
+  - header: 従業員コード
+    source: employee_code
+  - header: 氏名
+    source: name
+  - header: 所定内時間
+    source: regular
+  - header: 時間外時間
+    source: overtime
+  - header: 60時間超時間外
+    source: overtime_over60
+  - header: 深夜時間
+    source: night
+  - header: 休日時間
+    source: holiday
