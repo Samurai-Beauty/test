@@ -473,6 +473,9 @@
       <div class="nav-item" onclick="showSection('shift-manage')" id="nav-shift-manage" style="display:none">
         <span class="icon">📋</span><span>シフト管理</span>
       </div>
+      <div class="nav-item" onclick="showSection('paid-leave')" id="nav-paid-leave">
+        <span class="icon">🏖</span><span>有給申請</span>
+      </div>
       <div class="nav-item" onclick="showSection('shift-view')" id="nav-shift-view">
         <span class="icon">👁</span><span>シフト閲覧</span>
       </div>
@@ -831,6 +834,57 @@
           <span id="reservationLastUpdate" style="font-size:11px;color:#aaa"></span>
         </div>
         <div id="reservationList" style="color:#aaa;text-align:center;padding:30px;font-size:14px">読み込み中...</div>
+      </div>
+
+      <!-- ====== 有給申請 ====== -->
+      <div class="section" id="section-paid-leave">
+        <div class="section-title">🏖 有給申請</div>
+
+        <!-- 残日数（自分）-->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">🏖 有給残日数</div>
+          <div id="leaveBalanceMine" style="margin-top:10px;font-size:14px;color:#555">読み込み中...</div>
+          <div style="font-size:11px;color:#aaa;margin-top:8px">※残日数はマネーフォワードの記録をもとに管理者が更新します。申請中・承認済みの日数はここに反映されます。</div>
+        </div>
+
+        <!-- 申請フォーム -->
+        <div class="card" id="leaveFormArea" style="margin-bottom:16px">
+          <div class="card-title">✏️ 有給を申請する</div>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;max-width:420px">
+            <label style="font-size:13px;color:#555;font-weight:600">取得日
+              <input type="date" id="leaveDate" style="width:100%;margin-top:4px;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:14px">
+            </label>
+            <label style="font-size:13px;color:#555;font-weight:600">種別
+              <select id="leaveType" style="width:100%;margin-top:4px;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:14px">
+                <option value="full">全休（1.0日）</option>
+                <option value="half">半休（0.5日）</option>
+              </select>
+            </label>
+            <label style="font-size:13px;color:#555;font-weight:600">理由（任意）
+              <textarea id="leaveReason" rows="2" placeholder="私用のため 等" style="width:100%;margin-top:4px;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+            </label>
+            <button onclick="submitPaidLeave()" style="padding:10px 20px;background:#0f3460;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700">申請する</button>
+          </div>
+        </div>
+
+        <!-- 自分の申請一覧 -->
+        <div class="card" id="leaveMineArea" style="margin-bottom:16px">
+          <div class="card-title">📋 自分の申請状況</div>
+          <div id="leaveMineList" style="margin-top:10px;color:#aaa">読み込み中...</div>
+        </div>
+
+        <!-- 管理者：承認待ち -->
+        <div class="card" id="leaveAdminArea" style="margin-bottom:16px;display:none">
+          <div class="card-title">✅ 有給申請の承認</div>
+          <div id="leaveAdminList" style="margin-top:10px;color:#aaa">読み込み中...</div>
+        </div>
+
+        <!-- 管理者：残日数管理 -->
+        <div class="card" id="leaveBalanceAdminArea" style="display:none">
+          <div class="card-title">🗂 残日数の管理</div>
+          <div style="font-size:11px;color:#aaa;margin:6px 0 10px">付与日数はマネーフォワードの記録を転記してください。消化日数は承認時に自動加算されます（手動調整も可）。</div>
+          <div id="leaveBalanceAdminList" style="margin-top:8px"></div>
+        </div>
       </div>
 
       <div class="section" id="section-shift-view">
@@ -2531,6 +2585,7 @@ function showSection(name) {
   if (name === 'shift-request') renderShiftRequest();
   else if (name === 'shift-manage') { updateManageStoreTabs(); renderShiftManage(); }
   else if (name === 'shift-view') { renderShiftView(); loadShiftsFromSupabase(); }
+  else if (name === 'paid-leave') { loadPaidLeave().then(renderPaidLeave); }
   else if (name === 'stylist-manage') {
     if (isFCOwner()) {
       const sel = document.getElementById('newStylistStore');
@@ -3006,6 +3061,243 @@ function scheduleDashboardUpdates() {
     updateNextUpdateTime();
   }, 60000);
   updateNextUpdateTime();
+}
+
+// ========================================
+// 有給申請
+// ========================================
+let leaveRequests = []; // [{id,name,store,date,type,days,reason,status,createdAt,decidedBy,decidedAt}]
+let leaveBalances = {}; // { "名前": {granted, used, note, updatedAt} }
+
+function leaveIsAdmin() { return currentStore === 'honsha' || isFCOwner(); }
+
+// 管理者が扱う対象メンバー（本社=全スタイリスト / FCオーナー=自店のみ）
+function leaveAdminMembers() {
+  if (currentStore === 'honsha') return getAllMembers().filter(n => !HONSHA_MEMBERS.includes(n));
+  const base = STORE_MEMBERS[currentStore] || [];
+  const custom = customStylists.filter(s => s.store === currentStore).map(s => s.name);
+  return [...base, ...custom];
+}
+// 管理者が扱う対象申請（本社=全件 / FCオーナー=自店のみ）
+function leaveVisibleToAdmin(r) {
+  if (currentStore === 'honsha') return true;
+  return r.store === currentStore;
+}
+
+function leaveRemaining(name) {
+  const b = leaveBalances[name] || {};
+  return (Number(b.granted) || 0) - (Number(b.used) || 0);
+}
+function leaveDaysSum(name, statuses) {
+  return leaveRequests.filter(r => r.name === name && statuses.includes(r.status))
+    .reduce((s, r) => s + (Number(r.days) || 0), 0);
+}
+function leaveTypeLabel(t) { return t === 'half' ? '半休(0.5日)' : '全休(1.0日)'; }
+function fmtLeaveDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt)) return d;
+  return (dt.getMonth() + 1) + '/' + dt.getDate() + '(' + WEEKDAY_LABELS[dt.getDay()] + ')';
+}
+function leaveStatusBadge(status) {
+  const map = {
+    approved:  ['#e8f5e9', '#2e7d32', '承認済み'],
+    rejected:  ['#ffebee', '#c62828', '却下'],
+    cancelled: ['#f0f0f0', '#999999', '取消済み'],
+    pending:   ['#fff3e0', '#ef6c00', '承認待ち'],
+  };
+  const [bg, fg, tx] = map[status] || map.pending;
+  return '<span style="background:' + bg + ';color:' + fg + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">' + tx + '</span>';
+}
+
+async function loadPaidLeave() {
+  try {
+    const { data, error } = await sb.from('sales_data').select('store_key,data_json');
+    if (error) throw error;
+    leaveRequests = (data || [])
+      .filter(row => row.store_key && row.store_key.startsWith('leave_'))
+      .map(row => { let o = row.data_json; if (typeof o === 'string') { try { o = JSON.parse(o); } catch(e) { return null; } } return (o && o.id) ? o : null; })
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const balRow = (data || []).find(row => row.store_key === '__paid_leave_balances');
+    let bal = balRow ? balRow.data_json : {};
+    if (typeof bal === 'string') { try { bal = JSON.parse(bal); } catch(e) { bal = {}; } }
+    leaveBalances = bal || {};
+  } catch(e) {
+    console.error('loadPaidLeave error:', e);
+    leaveRequests = leaveRequests || [];
+    leaveBalances = leaveBalances || {};
+  }
+}
+
+// 申請1件をSupabaseへ（isNew=true:INSERT / false:UPDATE）ご意見箱と同じ方式
+async function saveLeaveRow(item, isNew) {
+  const key = 'leave_' + item.id;
+  const url = isNew ? SUPABASE_URL + '/rest/v1/sales_data'
+                    : SUPABASE_URL + '/rest/v1/sales_data?store_key=eq.' + encodeURIComponent(key);
+  const body = isNew
+    ? { store_key: key, filename: 'paid_leave.json', data_json: item, uploaded_at: item.createdAt || new Date().toISOString(), uploaded_by: item.name || '__system__' }
+    : { data_json: item, uploaded_at: new Date().toISOString() };
+  const res = await fetch(url, {
+    method: isNew ? 'POST' : 'PATCH', mode: 'cors', credentials: 'omit',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + ': ' + t.slice(0, 120)); }
+}
+
+async function saveLeaveBalances() {
+  await sb.from('sales_data').upsert({
+    store_key: '__paid_leave_balances', filename: 'paid_leave_balances.json',
+    data_json: leaveBalances, uploaded_at: new Date().toISOString(), uploaded_by: currentUser || '__system__',
+  }, { onConflict: 'store_key' });
+}
+
+async function submitPaidLeave() {
+  if (!currentUser) return;
+  const date = document.getElementById('leaveDate').value;
+  const type = document.getElementById('leaveType').value;
+  const reason = (document.getElementById('leaveReason').value || '').trim();
+  if (!date) { alert('取得日を選択してください'); return; }
+  const days = type === 'half' ? 0.5 : 1.0;
+  const item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    name: currentUser, store: currentStore, date, type, days, reason,
+    status: 'pending', createdAt: new Date().toISOString(), decidedBy: null, decidedAt: null,
+  };
+  try {
+    await saveLeaveRow(item, true);
+    document.getElementById('leaveReason').value = '';
+    document.getElementById('leaveDate').value = '';
+    await loadPaidLeave(); renderPaidLeave();
+    alert('有給申請を提出しました。承認をお待ちください。');
+  } catch(e) { alert('申請の保存に失敗しました: ' + e.message); }
+}
+
+async function cancelPaidLeave(id) {
+  const r = leaveRequests.find(x => x.id === id);
+  if (!r || r.status !== 'pending') return;
+  if (!confirm('この申請を取り消しますか？')) return;
+  r.status = 'cancelled'; r.decidedAt = new Date().toISOString();
+  try { await saveLeaveRow(r, false); await loadPaidLeave(); renderPaidLeave(); }
+  catch(e) { alert('取消に失敗しました: ' + e.message); }
+}
+
+async function decidePaidLeave(id, decision) {
+  const r = leaveRequests.find(x => x.id === id);
+  if (!r) return;
+  if (decision === 'approved' && leaveRemaining(r.name) < r.days) {
+    if (!confirm(r.name + ' さんの残日数が不足しています（残 ' + leaveRemaining(r.name) + '日 / 申請 ' + r.days + '日）。それでも承認しますか？')) return;
+  }
+  if (!confirm('この申請を「' + (decision === 'approved' ? '承認' : '却下') + '」にします。よろしいですか？')) return;
+  r.status = decision; r.decidedBy = currentUser; r.decidedAt = new Date().toISOString();
+  try {
+    await saveLeaveRow(r, false);
+    if (decision === 'approved') {
+      const b = leaveBalances[r.name] || { granted: 0, used: 0 };
+      b.used = (Number(b.used) || 0) + (Number(r.days) || 0);
+      b.updatedAt = new Date().toISOString();
+      leaveBalances[r.name] = b;
+      await saveLeaveBalances();
+    }
+    await loadPaidLeave(); renderPaidLeave();
+  } catch(e) { alert('更新に失敗しました: ' + e.message); }
+}
+
+async function saveOneLeaveBalance(i) {
+  const members = leaveAdminMembers();
+  const name = members[i];
+  if (!name) return;
+  const g = parseFloat(document.getElementById('lb-g-' + i).value);
+  const u = parseFloat(document.getElementById('lb-u-' + i).value);
+  const b = leaveBalances[name] || {};
+  b.granted = isNaN(g) ? 0 : g;
+  b.used = isNaN(u) ? 0 : u;
+  b.updatedAt = new Date().toISOString();
+  leaveBalances[name] = b;
+  try { await saveLeaveBalances(); await loadPaidLeave(); renderPaidLeave(); alert(name + ' の残日数を保存しました'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+function renderPaidLeave() {
+  if (!currentUser) return;
+  const isAdmin = leaveIsAdmin();
+
+  // 自分の残日数
+  const rem = leaveRemaining(currentUser);
+  const b = leaveBalances[currentUser] || {};
+  const pending = leaveDaysSum(currentUser, ['pending']);
+  const mineEl = document.getElementById('leaveBalanceMine');
+  if (b.granted == null && b.used == null && !leaveRequests.some(r => r.name === currentUser)) {
+    mineEl.innerHTML = '<span style="color:#aaa">まだ残日数が登録されていません。管理者にご確認ください。</span>';
+  } else {
+    mineEl.innerHTML =
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">' +
+      '<div><span style="font-size:28px;font-weight:800;color:' + (rem < 0 ? '#e74c3c' : '#0f3460') + '">' + rem + '</span><span style="font-size:13px;color:#777"> 日 残</span></div>' +
+      '<div style="font-size:12px;color:#777">付与 ' + (Number(b.granted) || 0) + '日 ／ 消化 ' + (Number(b.used) || 0) + '日' + (pending > 0 ? ' ／ <span style="color:#ef6c00">申請中 ' + pending + '日</span>' : '') + '</div>' +
+      '</div>';
+  }
+
+  // 管理者エリア表示切替
+  document.getElementById('leaveAdminArea').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('leaveBalanceAdminArea').style.display = isAdmin ? 'block' : 'none';
+
+  // 自分の申請一覧
+  const mine = leaveRequests.filter(r => r.name === currentUser);
+  document.getElementById('leaveMineList').innerHTML = mine.length ? mine.map(r =>
+    '<div style="padding:8px 0;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+    '<span style="font-weight:600">' + fmtLeaveDate(r.date) + '</span>' +
+    '<span style="font-size:12px;color:#777">' + leaveTypeLabel(r.type) + '</span>' +
+    leaveStatusBadge(r.status) +
+    (r.reason ? '<span style="font-size:12px;color:#999">' + escHtml(r.reason) + '</span>' : '') +
+    (r.status === 'pending' ? '<button onclick="cancelPaidLeave(\'' + r.id + '\')" style="margin-left:auto;padding:4px 10px;background:#eee;color:#555;border:none;border-radius:6px;cursor:pointer;font-size:11px">取消</button>' : '') +
+    '</div>'
+  ).join('') : '<p style="color:#aaa;margin:0">申請はまだありません</p>';
+
+  if (isAdmin) { renderLeaveAdmin(); renderLeaveBalanceAdmin(); }
+}
+
+function renderLeaveAdmin() {
+  const list = leaveRequests.filter(leaveVisibleToAdmin);
+  const pendingList = list.filter(r => r.status === 'pending');
+  const decided = list.filter(r => r.status === 'approved' || r.status === 'rejected').slice(0, 20);
+  const row = (r, withBtns) =>
+    '<div style="padding:10px 0;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+    '<span style="font-weight:700;min-width:5em">' + escHtml(r.name) + '</span>' +
+    '<span style="font-weight:600">' + fmtLeaveDate(r.date) + '</span>' +
+    '<span style="font-size:12px;color:#777">' + leaveTypeLabel(r.type) + '</span>' +
+    leaveStatusBadge(r.status) +
+    (r.reason ? '<span style="font-size:12px;color:#999">' + escHtml(r.reason) + '</span>' : '') +
+    (withBtns
+      ? '<span style="margin-left:auto;display:flex;gap:6px">' +
+        '<button onclick="decidePaidLeave(\'' + r.id + '\',\'approved\')" style="padding:5px 12px;background:#2e7d32;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">承認</button>' +
+        '<button onclick="decidePaidLeave(\'' + r.id + '\',\'rejected\')" style="padding:5px 12px;background:#c62828;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">却下</button>' +
+        '</span>'
+      : (r.decidedBy ? '<span style="margin-left:auto;font-size:11px;color:#aaa">' + escHtml(r.decidedBy) + '</span>' : '')) +
+    '</div>';
+  const html =
+    '<div style="font-size:12px;color:#777;margin-bottom:4px">承認待ち（' + pendingList.length + '件）</div>' +
+    (pendingList.length ? pendingList.map(r => row(r, true)).join('') : '<p style="color:#aaa;margin:0 0 8px">承認待ちはありません</p>') +
+    (decided.length ? '<div style="font-size:12px;color:#777;margin:14px 0 4px">処理済み（最新' + decided.length + '件）</div>' + decided.map(r => row(r, false)).join('') : '');
+  document.getElementById('leaveAdminList').innerHTML = html;
+}
+
+function renderLeaveBalanceAdmin() {
+  const members = leaveAdminMembers();
+  const html = members.map((name, i) => {
+    const b = leaveBalances[name] || {};
+    const g = b.granted != null ? b.granted : '';
+    const u = b.used != null ? b.used : '';
+    const rem = leaveRemaining(name);
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #eee">' +
+      '<span style="min-width:6em;font-weight:600">' + escHtml(name) + '</span>' +
+      '<label style="font-size:12px;color:#777">付与<input type="number" step="0.5" id="lb-g-' + i + '" value="' + g + '" style="width:70px;margin-left:4px;padding:5px;border:1px solid #ccc;border-radius:6px"></label>' +
+      '<label style="font-size:12px;color:#777">消化<input type="number" step="0.5" id="lb-u-' + i + '" value="' + u + '" style="width:70px;margin-left:4px;padding:5px;border:1px solid #ccc;border-radius:6px"></label>' +
+      '<span style="font-size:13px;color:' + (rem < 0 ? '#e74c3c' : '#0f3460') + ';font-weight:700">残 ' + rem + '日</span>' +
+      '<button onclick="saveOneLeaveBalance(' + i + ')" style="padding:5px 12px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">保存</button>' +
+      '</div>';
+  }).join('');
+  document.getElementById('leaveBalanceAdminList').innerHTML = html || '<p style="color:#aaa">対象メンバーがいません</p>';
 }
 
 // ========================================
