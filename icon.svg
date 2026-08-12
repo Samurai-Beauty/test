@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="white"/>
+
+  <!--
+    Samurai Beauty geometric S mark
+    Two diamonds, each divided into 4 triangles by cross lines.
+    Upper diamond: 3/4 dark (omit bottom-right = top loop of S hollow)
+    Lower diamond: 3/4 dark (omit top-left  = bottom loop of S hollow)
+  -->
+
+  <!-- Upper diamond: center(272, 168), half=112 -->
+  <!-- top-left  --> <polygon points="272,56  160,168 272,168" fill="#231815"/>
+  <!-- top-right --> <polygon points="272,56  384,168 272,168" fill="#231815"/>
+  <!-- bot-left  --> <polygon points="272,280 160,168 272,168" fill="#231815"/>
+  <!-- bot-right omitted (white hollow) -->
+  <line x1="160" y1="168" x2="384" y2="168" stroke="white" stroke-width="5"/>
+  <line x1="272" y1="56"  x2="272" y2="280" stroke="white" stroke-width="5"/>
+
+  <!-- Lower diamond: center(240, 344), half=112 -->
+  <!-- top-left omitted (white hollow) -->
+  <!-- top-right --> <polygon points="240,232 352,344 240,344" fill="#231815"/>
+  <!-- bot-left  --> <polygon points="240,456 128,344 240,344" fill="#231815"/>
+  <!-- bot-right --> <polygon points="240,456 352,344 240,344" fill="#231815"/>
+  <line x1="128" y1="344" x2="352" y2="344" stroke="white" stroke-width="5"/>
+  <line x1="240" y1="232" x2="240" y2="456" stroke="white" stroke-width="5"/>
+</svg>
