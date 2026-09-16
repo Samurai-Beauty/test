@@ -1,2 +1,4 @@
 out/
 __pycache__/
+mockup/_preview.*
+mockup/iroha-decor-wifi-card.html
