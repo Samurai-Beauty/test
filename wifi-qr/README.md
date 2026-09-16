@@ -7,6 +7,7 @@
 ```
 pip3 install qrcode pillow opencv-python-headless
 python3 generate.py --logo assets/logo.png --password '<暗号化キー>'
+python3 build_card_b.py --password '<暗号化キー>'      # B案の印刷データ
 ```
 
 出力は `out/`（gitignore 済み）。
@@ -30,3 +31,17 @@ python3 generate.py --logo assets/logo.png --password '<暗号化キー>'
 
 SSID は `generate.py` の `NETWORKS` に定義。暗号化キーはリポジトリに残さないため、
 実行時に `--password` で渡します。
+
+## 採用案（B｜大きな一枚QR）
+
+`build_card_b.py` が `final/` に印刷データを書き出します（gitignore 済み）。
+
+| ファイル | 用途 |
+|---|---|
+| `iroha-wifi-card-B.pdf` | A6（105×148mm）。文字とマークはベクター。入稿・印刷用 |
+| `...@300dpi.png` / `.jpg` | 1242×1750px。家庭用プリンタ・コンビニ印刷 |
+| `...@600dpi.png` / `.jpg` | 2484×3500px。大きめに印刷する場合 |
+
+Playfair Display と Noto Sans JP は使用文字だけをサブセット化して埋め込んでいるため、
+印刷時にネットワーク接続は不要で、フォントが置き換わりません。
+出力後、300dpi 画像から2枚のQRが読めることを自動検証します。

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>IROHA D'ECOR Wi-Fi Card</title>
+<style>
+{{FONTS}}
+
+@page { size: 105mm 148mm; margin: 0; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { margin: 0; padding: 0; background: #ffffff; }
+
+.card {
+  width: 105mm; height: 148mm;
+  background: #fbfaf9; color: #3a1b24;
+  font-family: 'Noto Sans JP', sans-serif; font-weight: 300;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 8.5mm 8mm 9.5mm;
+  overflow: hidden;
+}
+.mark { height: 13.5mm; width: auto; display: block; }
+.wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 4.6mm;
+             letter-spacing: 0.14em; margin-top: 2.6mm; line-height: 1; }
+.tokyo { font-family: 'Playfair Display', Georgia, serif; font-size: 2.2mm;
+          letter-spacing: 0.36em; color: #8e8085; margin-top: 1.5mm; line-height: 1;
+          text-indent: 0.36em; }
+.free { font-family: 'Playfair Display', Georgia, serif; font-size: 3.7mm;
+         letter-spacing: 0.3em; color: #8e8085; margin-top: 5mm; line-height: 1;
+         text-indent: 0.3em; }
+.qr-main { width: 50mm; height: 50mm; display: block; margin-top: 3.2mm; }
+.row { display: flex; align-items: center; gap: 2.2mm; margin-top: 2.2mm; }
+.band { font-family: 'Playfair Display', Georgia, serif; font-size: 2.7mm;
+         letter-spacing: 0.16em; color: #8e8085; line-height: 1; }
+.ssid { font-size: 3.4mm; line-height: 1; }
+
+.sub { display: flex; align-items: center; gap: 3.6mm; width: 100%;
+        border: 0.25mm solid #e4dcde; padding: 2.6mm 3.6mm; margin-top: 4.6mm; }
+.sub img { width: 17mm; height: 17mm; display: block; flex-shrink: 0; }
+.sub .txt { display: flex; flex-direction: column; gap: 1mm; }
+.sub .note { font-size: 2.5mm; color: #8e8085; line-height: 1.5; }
+
+.pass { display: flex; align-items: baseline; gap: 3.2mm; margin-top: auto; padding-top: 2mm; }
+.pass .label { font-family: 'Playfair Display', Georgia, serif; font-size: 2.5mm;
+                letter-spacing: 0.2em; color: #8e8085; }
+.pass .value { font-family: 'Playfair Display', Georgia, serif; font-size: 7.6mm;
+                letter-spacing: 0.26em; line-height: 1; text-indent: 0.26em; }
+</style>
+</head>
+<body>
+<div class="card">
+  {{MARK}}
+  <div class="wordmark">IROHA D'ECOR</div>
+  <div class="tokyo">TOKYO</div>
+
+  <div class="free">FREE Wi-Fi</div>
+
+  <img class="qr-main" src="data:image/png;base64,{{QR5}}" alt="IROHADECOR 5G の接続QRコード">
+  <div class="row">
+    <span class="band">5 GHz</span>
+    <span class="ssid">IROHADECOR 5G</span>
+  </div>
+
+  <div class="sub">
+    <img src="data:image/png;base64,{{QR24}}" alt="IROHADECOR 2.4G の接続QRコード">
+    <div class="txt">
+      <span class="band">2.4 GHz</span>
+      <span class="ssid">IROHADECOR 2.4G</span>
+      <span class="note">5GHz でつながらない機器はこちら</span>
+    </div>
+  </div>
+
+  <div class="pass">
+    <span class="label">PASSWORD</span>
+    <span class="value">{{PASSWORD}}</span>
+  </div>
+</div>
+</body>
+</html>
