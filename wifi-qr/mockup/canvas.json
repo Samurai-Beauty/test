@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",    "x": 0,    "y": 0, "w": 397, "h": 559, "title": "A｜クラシック・センター", "print": "fixed" },
+    { "file": "OptionB.dc.html", "x": 497,  "y": 0, "w": 397, "h": 559, "title": "B｜大きな一枚QR",       "print": "fixed" },
+    { "file": "OptionC.dc.html", "x": 994,  "y": 0, "w": 397, "h": 559, "title": "C｜バーガンディ地",     "print": "fixed" },
+    { "file": "OptionD.dc.html", "x": 1491, "y": 0, "w": 397, "h": 559, "title": "D｜エディトリアル",     "print": "fixed" }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -150, "w": 500, "text": "IROHA D'ECOR 店内用 Wi-Fi カード / A6（105×148mm）\nロゴ上・QR下。QRは実際に読み取れる本番データ入り。\nシンボルマークは正規ロゴ未入手のため代替版。" },
+    { "id": "tradeoff", "x": 994, "y": -150, "w": 397, "text": "C案はインク使用量が多く、家庭用プリンタでは地色がムラになりやすい。印刷所に出す前提の案。" }
+  ],
+  "launch": { "view": "canvas" }
+}
